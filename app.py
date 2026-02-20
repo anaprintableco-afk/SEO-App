@@ -54,6 +54,9 @@ ALLOWED_SUBJECTS = [
 ]
 ALLOWED_ROOMS = ["Bathroom", "Bedroom", "Dorm", "Entryway", "Game room", "Kids", "Kitchen & dining", "Laundry", "Living room", "Nursery", "Office"]
 
+# کلمات ممنوعه برای فریم تی‌وی
+FORBIDDEN_TV_WORDS = ["print", "printable", "poster", "canvas", "wall decor", "physical"]
+
 # ==========================================
 # 3. Database Uploader Logic
 # ==========================================
@@ -71,7 +74,7 @@ def get_or_upload_csv(_api_key):
         return None
 
 # ==========================================
-# 4. Core SEO Engine (With Validation Loop)
+# 4. Core SEO Engine (With Double Validation Loop)
 # ==========================================
 def generate_seo_logic(img, p_type, desc, api_key, revision_request=""):
     csv_file = get_or_upload_csv(api_key)
@@ -173,6 +176,24 @@ def generate_seo_logic(img, p_type, desc, api_key, revision_request=""):
         data = json.loads(raw_text)
         
         errors = []
+        
+        # ----------------------------------------------------
+        # 1. اعتبارسنجی کلمات ممنوعه (فقط برای فریم تی‌وی)
+        # ----------------------------------------------------
+        if p_type == "Art for frame TV":
+            title_lower = data.get("Title", "").lower()
+            tags_lower = [t.lower() for t in data.get("Tags", [])]
+            
+            for word in FORBIDDEN_TV_WORDS:
+                if word in title_lower:
+                    errors.append(f"CRITICAL: The word '{word}' is strictly FORBIDDEN in the Title for Frame TV mode.")
+                for tag in tags_lower:
+                    if word in tag:
+                        errors.append(f"CRITICAL: The word '{word}' is strictly FORBIDDEN in Tags. You illegally used it in the tag '{tag}'.")
+
+        # ----------------------------------------------------
+        # 2. اعتبارسنجی اتریبیوت‌ها
+        # ----------------------------------------------------
         attrs = data.get("Attributes", {})
         
         if attrs.get("1st Main Color") not in ALLOWED_COLORS: errors.append(f"1st Main Color '{attrs.get('1st Main Color')}' is not in list.")
@@ -191,11 +212,13 @@ def generate_seo_logic(img, p_type, desc, api_key, revision_request=""):
         for r in rooms:
             if r not in ALLOWED_ROOMS: errors.append(f"Room '{r}' is not allowed.")
 
+        # اگر خطایی نبود، خروجی تایید می‌شود
         if not errors:
             return data
             
-        st.toast(f"Checking AI compliance (Attempt {attempt+1})... Correcting attributes.")
-        current_prompt = base_prompt + "\n\nCRITICAL ERROR IN PREVIOUS ATTEMPT:\nYou used invalid attributes. Fix these errors immediately by strictly choosing from the provided lists:\n" + "\n".join(errors)
+        # در صورت خطا، پایتون به هوش مصنوعی تذکر می‌دهد و مجدد تلاش می‌کند
+        st.toast(f"Checking AI compliance (Attempt {attempt+1})... Correcting forbidden words/attributes.")
+        current_prompt = base_prompt + "\n\nCRITICAL ERROR IN PREVIOUS ATTEMPT:\nYou violated the strict rules. Fix these errors immediately:\n" + "\n".join(errors)
 
     return data
 
