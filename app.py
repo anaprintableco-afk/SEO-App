@@ -3,10 +3,10 @@ import google.generativeai as genai
 from PIL import Image
 import os
 import json
-import pandas as pd
+import time
 
 # ==========================================
-# 1. UI & Styling
+# 1. UI & Styling (دقیقا همان ظاهر قبلی)
 # ==========================================
 st.set_page_config(page_title="AtlasRank | Pro SEO", layout="wide")
 
@@ -28,7 +28,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# مقداردهی اولیه متغیرهای سشن برای کنترل مراحل
 if 'auth' not in st.session_state: st.session_state['auth'] = False
 if 'generated_data' not in st.session_state: st.session_state['generated_data'] = None
 if 'current_image' not in st.session_state: st.session_state['current_image'] = None
@@ -36,18 +35,29 @@ if 'product_type' not in st.session_state: st.session_state['product_type'] = ""
 if 'user_desc' not in st.session_state: st.session_state['user_desc'] = ""
 
 # ==========================================
-# 2. Functions
+# 2. Database Uploader Logic
 # ==========================================
-def load_csv_keywords():
+# این تابع فایل را فقط یک بار در روز در سرور گوگل آپلود می‌کند تا سرعت برنامه بالا بماند
+@st.cache_resource(ttl=86400)
+def get_or_upload_csv(_api_key):
+    genai.configure(api_key=_api_key)
     try:
-        df = pd.read_csv("MASTER_API_DATA.csv")
-        keywords = df['Keyword'].head(50).tolist()
-        return ", ".join(str(k) for k in keywords)
+        if not os.path.exists("MASTER_API_DATA.csv"):
+            return None
+            
+        csv_file = genai.upload_file(path="MASTER_API_DATA.csv", display_name="Master_Etsy_Database")
+        while csv_file.state.name == "PROCESSING":
+            time.sleep(1)
+            csv_file = genai.get_file(csv_file.name)
+        return csv_file
     except Exception:
-        return ""
+        return None
 
-def generate_seo_logic(img, p_type, desc, revision_request=""):
-    csv_data = load_csv_keywords()
+# ==========================================
+# 3. Core SEO Engine (لاجیک جدید و هوشمند)
+# ==========================================
+def generate_seo_logic(img, p_type, desc, api_key, revision_request=""):
+    csv_file = get_or_upload_csv(api_key)
     model = genai.GenerativeModel('models/gemini-2.5-flash')
     
     prompt = f"""
@@ -59,17 +69,24 @@ def generate_seo_logic(img, p_type, desc, revision_request=""):
     - Seller's Custom Description: {desc if desc else 'None provided'}
     """
     
-    # اگر کاربر درخواست ویرایش داده بود، به پرامپت اضافه می‌شود
     if revision_request:
-        prompt += f"\n# REVISION REQUEST (CRITICAL)\nThe user requested the following changes to the previous output: '{revision_request}'. Apply these changes while maintaining all previous Etsy rules.\n"
+        prompt += f"\n# REVISION REQUEST\nThe user requested these changes: '{revision_request}'. Apply them carefully.\n"
 
     prompt += f"""
+    # DATABASE MAPPING WORKFLOW (CRITICAL)
+    I have attached our entire Master Keywords Database (CSV). You MUST follow this exact thought process for Title and Tags:
+    1. IMAGE FIRST: Analyze the visual elements of the image. What is it?
+    2. BRAINSTORM: Think of natural describing keywords (e.g., "farmhouse art").
+    3. DATABASE SCAN: You MUST scan the attached CSV to find the closest, highest-converting matches for your brainstormed words. 
+       - EXAMPLE: If you see a farmhouse style painting, you might think of "farmhouse art". BUT, if you check the CSV and see "farmhouse wall art", you MUST output "farmhouse wall art" instead.
+    4. RELEVANCE: ONLY use keywords from the CSV that genuinely match the image. Do not use unrelated words just because they are in the database.
+
     # ETSY SELLER HANDBOOK RULES:
-    1. TITLE: Clear, scannable (under 15 words). NO repetitions. NO subjective words.
-    2. TAGS: 13 tags. NO SINGLE-WORD TAGS. Max 20 chars per tag.
+    1. TITLE: Clear, scannable (under 15 words). NO repetitions. Most important CSV-matched traits first.
+    2. TAGS: 13 tags. NO SINGLE-WORD TAGS. Max 20 chars per tag. Use CSV-matched phrases heavily.
     3. DESCRIPTION: First sentence must clearly describe the item naturally.
 
-    # ATTRIBUTES (CRITICAL RULE - MUST FILL EVERY SINGLE FIELD)
+    # ATTRIBUTES (MUST FILL EVERY SINGLE FIELD)
     - 1st Main Color
     - 2nd Main Color
     - Home Style
@@ -78,9 +95,6 @@ def generate_seo_logic(img, p_type, desc, revision_request=""):
     - Celebration (or "Not Applicable")
     - Occasion (or "Not Applicable")
 
-    # CSV DATA:
-    [{csv_data}]
-
     # OUTPUT STRUCTURE (JSON FORMAT REQUIRED)
     Return ONLY a valid JSON object:
     {{
@@ -88,23 +102,24 @@ def generate_seo_logic(img, p_type, desc, revision_request=""):
         "Description": "...",
         "AltTexts": ["...", "...", "...", "...", "...", "...", "...", "...", "...", "..."],
         "Attributes": {{
-            "1st Main Color": "...",
-            "2nd Main Color": "...",
-            "Home Style": "...",
-            "Celebration": "...",
-            "Occasion": "...",
-            "Subject": "...",
-            "Room": "..."
+            "1st Main Color": "...", "2nd Main Color": "...", "Home Style": "...",
+            "Celebration": "...", "Occasion": "...", "Subject": "...", "Room": "..."
         }},
         "Tags": ["tag1", "tag2", "tag3", "tag4", "tag5", "tag6", "tag7", "tag8", "tag9", "tag10", "tag11", "tag12", "tag13"]
     }}
     """
-    response = model.generate_content([prompt, img])
+    
+    # ارسال همزمان پرامپت، عکس و فایل دیتابیس به مغز هوش مصنوعی
+    contents = [prompt, img]
+    if csv_file:
+        contents.append(csv_file)
+        
+    response = model.generate_content(contents)
     raw_text = response.text.replace('```json', '').replace('```', '').strip()
     return json.loads(raw_text)
 
 # ==========================================
-# 3. Main Logic
+# 4. Main Dashboard (UI قبلی حفظ شد)
 # ==========================================
 if not st.session_state['auth']:
     st.markdown("<br><br><h1 style='text-align: center; color: #FF5A1F !important;'>🚀 AtlasRank</h1>", unsafe_allow_html=True)
@@ -129,9 +144,6 @@ else:
         st.stop()
     genai.configure(api_key=api_key)
 
-    # -------------------------------------------------------------------
-    # مرحله ۱: آپلود و تنظیمات (فقط وقتی نشان داده می‌شود که دیتایی تولید نشده باشد)
-    # -------------------------------------------------------------------
     if not st.session_state['generated_data']:
         st.markdown("<div class='box-title'>1. Select Product Type</div>", unsafe_allow_html=True)
         p_type = st.radio("Product Type:", ["Art for frame TV", "Printable Wall Art"], horizontal=True, label_visibility="collapsed")
@@ -147,84 +159,70 @@ else:
             st.image(img, width=250)
             
             if st.button("Analyze & Generate SEO"):
-                # ذخیره مقادیر در سشن برای استفاده در آینده
                 st.session_state['current_image'] = img
                 st.session_state['product_type'] = p_type
                 st.session_state['user_desc'] = u_desc
                 
-                with st.spinner("Atlas AI is crafting your masterpiece..."):
+                with st.spinner("Atlas AI is scanning your database for the best keywords..."):
                     try:
-                        data = generate_seo_logic(img, p_type, u_desc)
+                        data = generate_seo_logic(img, p_type, u_desc, api_key)
                         st.session_state['generated_data'] = data
-                        st.rerun() # رفرش صفحه برای محو کردن بخش آپلود و نمایش نتایج
+                        st.rerun()
                     except Exception as e:
                         st.error(f"Error: {e}")
 
-    # -------------------------------------------------------------------
-    # مرحله ۲: نمایش نتایج، ویرایش و شروع مجدد (فقط وقتی دیتا موجود است)
-    # -------------------------------------------------------------------
     else:
         data = st.session_state['generated_data']
         
-        # نمایش عکس کوچک شده برای یادآوری
         if st.session_state['current_image']:
             st.image(st.session_state['current_image'], width=150, caption="Analyzed Image")
             
-        st.success("✅ SEO Generated Successfully!")
+        st.success("✅ SEO Generated & Database-Optimized!")
         st.markdown("---")
         
-        # 1. تایتل
         title_val = data.get('Title', '')
         st.markdown(f"<div class='box-title'>📌 Optimized Title</div>", unsafe_allow_html=True)
         st.text_area(f"Length: {len(title_val)} chars", value=title_val, height=68)
         
-        # 2. تگ‌ها
         st.markdown("<div class='box-title'>🏷️ 13 SEO Tags</div>", unsafe_allow_html=True)
         tags_list = data.get('Tags', [])
         tags_with_counts = [f"{t} ({len(t)})" for t in tags_list]
         st.info(" | ".join(tags_with_counts))
         st.text_area("Copy Tags (Comma separated):", value=", ".join(tags_list), height=68)
         
-        # 3. اتریبیوت‌ها (حل مشکل لیست‌ها و داینامیک شدن باکس‌ها)
         st.markdown("<div class='box-title'>⚙️ Item Attributes</div>", unsafe_allow_html=True)
         attr_cols = st.columns(3)
         col_idx = 0
         for key, val in data.get('Attributes', {}).items():
             with attr_cols[col_idx % 3]:
-                # اگر ولیو یک لیست بود، آن را با کاما به هم می‌چسبانیم (حل مشکل سابجکت و اتاق‌ها)
                 display_val = ", ".join([str(v) for v in val]) if isinstance(val, list) else str(val)
-                # استفاده از text_area به جای text_input برای اینکه داینامیک شود و جا باز کند
                 st.text_area(key, value=display_val, height=68, key=f"attr_{key}")
             col_idx += 1
             
-        # 4. Alt Texts
         st.markdown("<div class='box-title'>🖼️ Alt Texts (10 Options)</div>", unsafe_allow_html=True)
         alts = data.get('AltTexts', [])
         alt_text_str = "\n".join([f"{i+1}. {alt}" for i, alt in enumerate(alts)])
         st.text_area("Select and copy one:", value=alt_text_str, height=250)
             
-        # 5. توضیحات
         st.markdown("<div class='box-title'>📝 Product Description</div>", unsafe_allow_html=True)
         st.text_area("Description:", value=data.get('Description', ''), height=300)
 
         st.markdown("---")
         
-        # -------------------------------------------------------------------
-        # بخش درخواست تغییرات و دکمه‌های کنترل
-        # -------------------------------------------------------------------
+        # بخش Revision و Start Over
         st.markdown("<div class='box-title'>🔄 Revision & New Actions</div>", unsafe_allow_html=True)
         revision_text = st.text_area("Not satisfied? Tell AI what to change (e.g., 'Make it more romantic', 'Change colors to red')", height=68)
         
         col_rev1, col_rev2 = st.columns(2)
         with col_rev1:
             if st.button("✨ Apply Changes & Regenerate"):
-                with st.spinner("Applying your revisions..."):
+                with st.spinner("Applying your revisions and rescanning database..."):
                     try:
-                        # ارسال مجدد به هوش مصنوعی همراه با درخواست تغییرات کاربر
                         new_data = generate_seo_logic(
                             st.session_state['current_image'], 
                             st.session_state['product_type'], 
                             st.session_state['user_desc'], 
+                            api_key,
                             revision_request=revision_text
                         )
                         st.session_state['generated_data'] = new_data
@@ -234,7 +232,6 @@ else:
                         
         with col_rev2:
             if st.button("🗑️ Start Over (Upload New Image)"):
-                # پاک کردن اطلاعات قبلی برای آپلود عکس جدید
                 st.session_state['generated_data'] = None
                 st.session_state['current_image'] = None
                 st.session_state['product_type'] = ""
