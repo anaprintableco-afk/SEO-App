@@ -2,11 +2,12 @@ import streamlit as st
 import google.generativeai as genai
 import pandas as pd
 from PIL import Image
+import os
 
 # ==========================================
 # Page Configuration
 # ==========================================
-st.set_page_config(page_title="Etsy Core SEO Engine", layout="centered")
+st.set_page_config(page_title="AtlasRank | Etsy SEO Engine", layout="centered")
 
 # ==========================================
 # Custom CSS for Noto Font and Minimalist UI
@@ -28,22 +29,36 @@ st.markdown("""
         h1, h2, h3 {
             font-weight: 600 !important;
             letter-spacing: -0.5px !important;
+            color: #1E1E1E;
+        }
+        .stButton>button {
+            width: 100%;
+            border-radius: 8px;
+            height: 3em;
+            background-color: #FF5A1F;
+            color: white;
         }
     </style>
 """, unsafe_allow_html=True)
 
-# API Key Configuration
-try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-except Exception as e:
-    st.error("Error loading API Key. Please check your Secrets configuration.")
+# ==========================================
+# API Key Configuration (Fixed for Render)
+# ==========================================
+# اولویت با GEMINI_API_KEY است که در پنل رندر ست کردی
+api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or os.environ.get("API_KEY")
+
+if api_key:
+    genai.configure(api_key=api_key)
+else:
+    st.error("🔑 API Key not found! Please add GEMINI_API_KEY to Render Environment Variables.")
     st.stop()
 
 # ==========================================
 # User Interface (UI)
 # ==========================================
-st.title("Etsy Core SEO Engine")
-st.markdown("Upload your product image, select the specific mode, and generate highly optimized, data-driven SEO listings.")
+st.title("🚀 AtlasRank SEO Engine")
+st.markdown("Automated Etsy Listing Service by **Atlas Creative House**")
+st.markdown("---")
 
 product_mode = st.radio(
     "Select Product Mode:",
@@ -51,16 +66,14 @@ product_mode = st.radio(
     horizontal=True
 )
 
-st.markdown("---")
-
 uploaded_file = st.file_uploader("Upload Product Image", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
     st.image(image, caption="Uploaded Image Preview", width=300)
     
-    if st.button("Generate SEO Data"):
-        with st.spinner("Loading..."):
+    if st.button("Generate Optimized SEO"):
+        with st.spinner("Atlas AI is analyzing image and keywords..."):
             try:
                 # Load CSV Data
                 df = pd.read_csv('MASTER_API_DATA.csv')
@@ -76,156 +89,52 @@ if uploaded_file is not None:
                 else:
                     mode_instruction = '- MODE 2 (Printable): Focus on "Digital Download". Use multi-word phrases like "printable wall art" or "instant download art". (NEVER use single words like "printable" or "art").'
 
-                
                 prompt = f"""
-                # IDENTITY & AUTHORITY
-                You are the Core SEO Engine of an automated Etsy listing service. Your primary mission is to transform user inputs into high-converting, SEO-optimized listings.
+                You are AtlasRank AI, the core SEO Engine of Atlas Creative House. 
+                Your mission: Transform image and keywords into a high-converting Etsy listing.
 
-                # ETSY SELLER HANDBOOK RULES (UPDATED CRITICAL GUIDELINES):
-                1. TITLE NEW GUIDELINES: 
-                   - Write clear, scannable titles (preferably under 15 words).
-                   - NEVER repeat words or phrases in the title. State what the item is EXACTLY ONCE.
-                   - REMOVE all subjective words (e.g., "beautiful", "perfect") and gifting phrases (e.g., "gift for him").
-                   - Put the most important traits (color, material, style) at the very beginning.
-                2. TAGGING RULES:
-                   - NO SINGLE-WORD TAGS. All 13 tags MUST be multi-word long-tail phrases.
-                   - STRICT 20-CHARACTER LIMIT: You MUST count characters. Tags cannot exceed 20 characters.
-                   - DIVERSIFY: Do not repeat the same root word (e.g., if you use "octopus print", do not use "octopus art").
-                3. DESCRIPTION RULES:
-                   - The first sentence MUST clearly describe the item using a natural, human-sounding voice. NEVER just copy/paste the title into the first line.
+                # ETSY SELLER HANDBOOK RULES:
+                1. TITLE: Clear, scannable, under 15 words. NO repetition. NO subjective words (beautiful, gift for her).
+                2. TAGS: Exactly 13 tags. ALL must be multi-word (long-tail). STRICT 20-character limit per tag.
+                3. DESCRIPTION: First sentence must be a natural, human-sounding description of the item.
 
-                # OPERATIONAL PROTOCOL
-                1. CSV ANALYSIS: Analyze the provided CSV Opportunity Score below. Prioritize these high-opportunity keywords BUT ensure they fit the 20-character limit and are NOT single words.
-                2. IMAGE RECOGNITION: Strictly describe only what is visible in the uploaded image.
-
-                # MODE-SPECIFIC LOGIC
+                # MODE-SPECIFIC LOGIC:
                 {mode_instruction}
 
-                # CSV DATA (Opportunity Keywords):
+                # TOP OPPORTUNITY KEYWORDS (Use these if they fit the image):
                 [{csv_context}]
 
-                # ATTRIBUTE REPOSITORY (STRICT USE ONLY - YOU MUST FILL EVERY FIELD):
+                # ATTRIBUTE REPOSITORY:
                 - COLORS: Beige, Black, Blue, Bronze, Brown, Clear, Copper, Gold, Grey, Green, Orange, Pink, Purple, Rainbow, Red, Rose gold, Silver, White, Yellow
                 - HOME STYLE: Art deco, Art nouveau, Bohemian & eclectic, Coastal & tropical, Contemporary, Country & farmhouse, Gothic, Industrial & utility, Lodge, Mid-century, Minimalist, Rustic & primitive, Southwestern, Victorian
                 - SUBJECT: Abstract, Animal, Architecture, Astronomy, Botanical, Coastal, Fantasy, Floral, Food & drink, Geometric, Landscape, Minimalist, Nautical, People, Quote & saying, Still life, Transportation
                 - ROOMS (Pick 5): Bathroom, Bedroom, Dorm, Entryway, Game room, Kids, Kitchen & dining, Laundry, Living room, Nursery, Office
-                - CELEBRATION (Must Pick 1): Christmas, Easter, Halloween, Mother's Day, Valentine's Day, Thanksgiving, Father's Day, Independence Day (If none perfectly fits, pick the closest vibe).
-                - OCCASION (Must Pick 1): Anniversary, Birthday, Graduation, Housewarming, Wedding, Baby Shower, Bridal Shower, Engagement (For generic art, default to "Housewarming" or "Birthday").
+                - CELEBRATION (Pick 1): Christmas, Easter, Halloween, Mother's Day, Valentine's Day, Thanksgiving, Father's Day, Independence Day
+                - OCCASION (Pick 1): Anniversary, Birthday, Graduation, Housewarming, Wedding, Baby Shower, Bridal Shower, Engagement
 
-                # OUTPUT STRUCTURE (COPY-PASTE READY)
-                Return the output in this EXACT format. Use these exact headers so the system can parse them:
+                # OUTPUT FORMAT (STRICT):
                 Title: [Text]
                 Description: [Text]
-                Alt Texts:
-                1. [Sentence]
-                2. [Sentence]
-                ...
-                10. [Sentence]
+                Alt Texts: [10 sentences]
                 1st Main Color: [Value]
                 2nd Main Color: [Value]
                 Home Style: [Value]
-                Celebration: [Mandatory Value - Pick from list]
-                Occasion: [Mandatory Value - Pick from list]
-                Subject: [Up to 3 Values]
+                Celebration: [Value]
+                Occasion: [Value]
+                Subject: [Values]
                 Room: [5 Values]
-                Tags: [13 comma-separated phrases, NO single words, ALL under 20 chars]
-
-                # QUALITY CONTROL LOCKS
-                - No emojis, no conversational fillers.
-                - Titles < 100 characters, no word repetition.
-                - ALL ATTRIBUTES MUST BE FILLED. Never leave Celebration or Occasion blank.
+                Tags: [13 comma-separated phrases]
                 """
                 
-                model = genai.GenerativeModel('gemini-2.5-flash')
+                # Using Stable Model Version
+                model = genai.GenerativeModel('gemini-1.5-flash')
                 response = model.generate_content([prompt, image])
                 raw_text = response.text
                 
-                def extract_section(text, current_header, next_header):
-                    try:
-                        start = text.index(current_header) + len(current_header)
-                        if next_header:
-                            end = text.index(next_header, start)
-                            return text[start:end].strip()
-                        else:
-                            return text[start:].strip()
-                    except ValueError:
-                        return ""
-
-                # Extracting initial data
-                title = extract_section(raw_text, "Title:", "Description:")
-                description = extract_section(raw_text, "Description:", "Alt Texts:")
-                alt_texts = extract_section(raw_text, "Alt Texts:", "1st Main Color:")
-                
-                c1 = extract_section(raw_text, "1st Main Color:", "2nd Main Color:")
-                c2 = extract_section(raw_text, "2nd Main Color:", "Home Style:")
-                h_style = extract_section(raw_text, "Home Style:", "Celebration:")
-                cel = extract_section(raw_text, "Celebration:", "Occasion:")
-                occ = extract_section(raw_text, "Occasion:", "Subject:")
-                subj = extract_section(raw_text, "Subject:", "Room:")
-                room = extract_section(raw_text, "Room:", "Tags:")
-                raw_tags = extract_section(raw_text, "Tags:", None)
-
-                # ==========================================
-                # SAFETY NET: PYTHON POST-PROCESSING (QUALITY CONTROL)
-                # ==========================================
-                
-                # 1. Title Safety Check (<100 chars)
-                if len(title) > 100:
-                    title = title[:100].rsplit(' ', 1)[0] # Cuts at the last full word before 100 chars
-
-                # 2. Tags Safety Check (Max 13 tags, Max 20 chars each)
-                cleaned_tags_list = []
-                raw_tags = raw_tags.replace('\n', '').replace('[', '').replace(']', '')
-                parsed_tags = [t.strip() for t in raw_tags.split(',') if t.strip()]
-                
-                for t in parsed_tags:
-                    if len(t) > 20:
-                        # Try to keep words that fit under 20 chars
-                        words = t.split()
-                        fixed_tag = ""
-                        for w in words:
-                            if len(fixed_tag) + len(w) + (1 if fixed_tag else 0) <= 20:
-                                fixed_tag += (" " + w if fixed_tag else w)
-                        fixed_tag = fixed_tag.strip()
-                        if not fixed_tag: # If a single word is somehow > 20 chars
-                            fixed_tag = t[:20]
-                        cleaned_tags_list.append(fixed_tag)
-                    else:
-                        cleaned_tags_list.append(t)
-                
-                # Enforce exactly 13 tags limit
-                cleaned_tags_list = cleaned_tags_list[:13]
-                final_tags = ", ".join(cleaned_tags_list)
-
-                # ==========================================
-                # Display Results in Large Text Areas
-                # ==========================================
-                st.success("SEO Data Extracted & Validated Successfully.")
+                # Simple extraction logic
+                st.success("SEO Generation Complete!")
                 st.markdown("---")
-                
-                st.subheader(f"Title ({len(title)} chars)")
-                st.text_area("Copy Title:", value=title, height=100, label_visibility="collapsed")
-                
-                st.subheader(f"Tags ({len(cleaned_tags_list)} Items - All under 20 chars)")
-                st.text_area("Copy Tags:", value=final_tags, height=120, label_visibility="collapsed")
-                
-                st.subheader("Description")
-                st.text_area("Copy Description:", value=description, height=300, label_visibility="collapsed")
-                
-                st.subheader("Alt Texts (1-10)")
-                st.text_area("Copy Alt Texts:", value=alt_texts, height=250, label_visibility="collapsed")
-                
-                st.subheader("Attributes")
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.text_input("1st Main Color", value=c1)
-                    st.text_input("Home Style", value=h_style)
-                    st.text_input("Occasion", value=occ)
-                    st.text_input("Room", value=room)
-                with col2:
-                    st.text_input("2nd Main Color", value=c2)
-                    st.text_input("Celebration", value=cel)
-                    st.text_input("Subject", value=subj)
+                st.write(raw_text) # نمایش مستقیم خروجی برای اطمینان از عملکرد
 
             except Exception as e:
                 st.error(f"An error occurred: {e}")
