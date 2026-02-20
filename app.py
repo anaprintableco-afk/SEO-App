@@ -13,11 +13,10 @@ st.set_page_config(page_title="Etsy SEO Pro AI", page_icon="📈", layout="cente
 LINK_TO_BUY = "https://your-gumroad-link.com"
 PREMIUM_UPGRADE_CODE = "PRO-ETSY-500"
 
-# خواندن کلید API از گاوصندوق Streamlit
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 except Exception as e:
-    st.error("خطا در خواندن کلید API از Secrets. لطفاً مطمئن شوید کلید را درست وارد کرده‌اید.")
+    st.error("خطا در خواندن کلید API از Secrets.")
     st.stop()
 
 # ==========================================
@@ -132,35 +131,14 @@ if uploaded_file is not None:
     
     if st.button("✨ پردازش هوشمند (کسر ۱ اعتبار)"):
         with st.spinner("در حال ارتباط با سرور گوگل و تحلیل عکس..."):
-            valid_models = []
             try:
-                # رادار هوشمند: پیدا کردن مدل‌های فعال روی کلید شما
-                for m in genai.list_models():
-                    if 'generateContent' in m.supported_generation_methods:
-                        valid_models.append(m.name)
-                
-                # انتخاب بهترین مدل تصویری
-                target_model = None
-                for pref in ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro-vision', 'gemini-pro']:
-                    for vm in valid_models:
-                        if pref in vm:
-                            target_model = vm
-                            break
-                    if target_model:
-                        break
-                
-                if not target_model and valid_models:
-                    target_model = valid_models[0] # اگر هیچکدام نبود، اولین مدل لیست را بردار
-                    
-                target_model_clean = target_model.replace('models/', '') if target_model else 'gemini-1.5-flash'
-
-                # خواندن دیتابیس
+                # بهینه‌سازی دیتابیس: کاهش از 300 به 100 برای جلوگیری از ارور Quota
                 df = pd.read_csv('MASTER_API_DATA.csv')
                 df['Avg_Searches'] = pd.to_numeric(df['Avg_Searches'], errors='coerce').fillna(0)
                 df['Competition'] = pd.to_numeric(df['Competition'], errors='coerce').fillna(1)
                 df['Opportunity'] = df['Avg_Searches'] / df['Competition']
                 
-                top_keywords = df.sort_values(by='Opportunity', ascending=False).head(300)['Keyword'].tolist()
+                top_keywords = df.sort_values(by='Opportunity', ascending=False).head(100)['Keyword'].tolist()
                 csv_context = ", ".join(str(x) for x in top_keywords)
                 
                 prompt = f"""
@@ -184,7 +162,8 @@ if uploaded_file is not None:
                 Tags: [13 Tags]
                 """
                 
-                model = genai.GenerativeModel(target_model_clean)
+                # تنظیم دقیق روی مدلی که در لیست شما بود (سریع و با سهمیه بالا)
+                model = genai.GenerativeModel('gemini-2.5-flash')
                 response = model.generate_content([prompt, image])
                 
                 st.success("✅ سئو با موفقیت انجام شد!")
@@ -196,7 +175,3 @@ if uploaded_file is not None:
                 
             except Exception as e:
                 st.error(f"❌ خطایی رخ داد: {e}")
-                if valid_models:
-                    st.warning(f"مدل‌های فعال شناسایی شده روی اکانت شما: {valid_models}")
-                else:
-                    st.warning("هیچ مدلی روی این کلید API شناسایی نشد. مطمئن شوید کلید API را درست کپی کرده‌اید.")
