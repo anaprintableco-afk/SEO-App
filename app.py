@@ -79,7 +79,7 @@ def main_app():
             with st.spinner("AI Analysis in progress..."):
                 try:
                     # استفاده از مدل پایدار Pro-Vision برای حل مشکل 404
-                    model = genai.GenerativeModel('gemini-pro-vision')
+                    model = genai.GenerativeModel('gemini-1.5-flash')
                     
                     prompt = "Analyze this image and generate: 1. Etsy Title (max 140 chars) 2. 13 SEO Tags 3. Product Description."
                     
