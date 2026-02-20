@@ -54,9 +54,6 @@ ALLOWED_SUBJECTS = [
 ]
 ALLOWED_ROOMS = ["Bathroom", "Bedroom", "Dorm", "Entryway", "Game room", "Kids", "Kitchen & dining", "Laundry", "Living room", "Nursery", "Office"]
 
-# کلمات ممنوعه برای فریم تی‌وی
-FORBIDDEN_TV_WORDS = ["print", "printable", "poster", "canvas", "wall decor", "physical"]
-
 # ==========================================
 # 3. Database Uploader Logic
 # ==========================================
@@ -74,7 +71,7 @@ def get_or_upload_csv(_api_key):
         return None
 
 # ==========================================
-# 4. Core SEO Engine (With Double Validation Loop)
+# 4. Core SEO Engine (One-Shot Self-Correction)
 # ==========================================
 def generate_seo_logic(img, p_type, desc, api_key, revision_request=""):
     csv_file = get_or_upload_csv(api_key)
@@ -92,6 +89,7 @@ def generate_seo_logic(img, p_type, desc, api_key, revision_request=""):
         - Avoid subjective words (perfect, beautiful, stunning).
         - No repeated words.
         - Every word MUST start with a capital letter (Title Case).
+        - FORBIDDEN WORDS: "print", "printable", "poster", "canvas", "wall decor".
         
         DESCRIPTION RULES (TV):
         - Under 400 characters. Emotional but clear. No sales language.
@@ -128,99 +126,60 @@ def generate_seo_logic(img, p_type, desc, api_key, revision_request=""):
     
     {mode_rules}
 
-    # 📸 IMAGE CONTEXT EXTRACTION (CRITICAL):
-    - **ARTISTIC MEDIUM & STYLE:** Carefully examine the image to identify its EXACT artistic medium and style (whatever it may be: watercolor, oil painting, pencil sketch, line ink drawing, digital illustration, photography, vintage etching, etc.). You MUST explicitly include the accurately identified medium/style in your tags and description. If it uses multiple techniques, mention all of them. Do not use generic terms if a specific technique is visible.
-    - **SEASON & LOCATION:** Identify any visible season, holiday, or location and include them.
+    # 📸 IMAGE CONTEXT EXTRACTION:
+    - **ARTISTIC MEDIUM & STYLE:** Identify the exact medium (watercolor, line ink drawing, sketch, digital, etc.). Include all visible techniques.
+    - **SEASON & LOCATION:** Identify any visible season, holiday, or location.
 
-    # TAGGING RULES (CRITICAL):
+    # TAGGING RULES:
     - Exactly 13 tags. NO SINGLE-WORD TAGS. Max 20 chars per tag.
-    - If seasonal/holiday elements are VISIBLE in the image, include them heavily.
     - Scan the attached CSV file and prioritize exact matches for your tags.
 
     # STRICT ATTRIBUTES PROTOCOL (YOU MUST PICK FROM THESE EXACT LISTS ONLY)
-    You are FORCED to select attributes. "Not Applicable" or blank is FORBIDDEN. Guess the closest match if unsure.
-    - 1st Main Color: Choose exactly 1 from {ALLOWED_COLORS}
-    - 2nd Main Color: Choose exactly 1 from {ALLOWED_COLORS}
-    - Home Style: Choose exactly 1 from {ALLOWED_STYLES}
-    - Celebration: Choose exactly 1 from {ALLOWED_CELEBS}. YOU MUST PICK ONE.
-    - Occasion: Choose exactly 1 from {ALLOWED_OCCASIONS}. YOU MUST PICK ONE.
-    - Subject: Choose up to 3 ONLY from {ALLOWED_SUBJECTS}
-    - Room: Choose exactly 5 ONLY from {ALLOWED_ROOMS}
+    - 1st Main Color & 2nd Main Color: {ALLOWED_COLORS}
+    - Home Style: {ALLOWED_STYLES}
+    - Celebration: {ALLOWED_CELEBS}
+    - Occasion: {ALLOWED_OCCASIONS}
+    - Subject (Up to 3): {ALLOWED_SUBJECTS}
+    - Room (Exactly 5): {ALLOWED_ROOMS}
 
-    # OUTPUT STRUCTURE (JSON)
-    Return ONLY a valid JSON object with exactly 5 AltTexts:
+    # OUTPUT STRUCTURE (CHAIN OF THOUGHT JSON)
+    You MUST output ONLY a valid JSON object. 
+    To ensure accuracy, you must first do an "Internal_Audit" before generating the "Final_SEO".
+    Follow this EXACT structure:
     {{
-        "Title": "...",
-        "Description": "...",
-        "AltTexts": ["...", "...", "...", "...", "..."],
-        "Attributes": {{
-            "1st Main Color": "...", "2nd Main Color": "...", "Home Style": "...",
-            "Celebration": "...", "Occasion": "...", "Subject": ["..."], "Room": ["..."]
+        "Internal_Audit": {{
+            "Step_1_Brainstorm": "Brainstorm tags and title based on image and CSV.",
+            "Step_2_Forbidden_Check": "Did I use any forbidden words like 'print' for TV Mode? If yes, remove them.",
+            "Step_3_Attribute_Check": "Are all selected attributes EXACTLY matching the provided allowed lists?"
         }},
-        "Tags": ["..."]
+        "Final_SEO": {{
+            "Title": "...",
+            "Description": "...",
+            "AltTexts": ["...", "...", "...", "...", "..."],
+            "Attributes": {{
+                "1st Main Color": "...", "2nd Main Color": "...", "Home Style": "...",
+                "Celebration": "...", "Occasion": "...", "Subject": ["..."], "Room": ["..."]
+            }},
+            "Tags": ["..."]
+        }}
     }}
     """
     
     if revision_request:
         base_prompt += f"\n# REVISION REQUEST: {revision_request}\n"
 
-    max_retries = 3
-    current_prompt = base_prompt
+    contents = [base_prompt, img]
+    if csv_file: contents.append(csv_file)
+        
+    response = model.generate_content(contents)
+    raw_text = response.text.replace('```json', '').replace('```', '').strip()
     
-    for attempt in range(max_retries):
-        contents = [current_prompt, img]
-        if csv_file: contents.append(csv_file)
-            
-        response = model.generate_content(contents)
-        raw_text = response.text.replace('```json', '').replace('```', '').strip()
-        data = json.loads(raw_text)
-        
-        errors = []
-        
-        # ----------------------------------------------------
-        # 1. اعتبارسنجی کلمات ممنوعه (فقط برای فریم تی‌وی)
-        # ----------------------------------------------------
-        if p_type == "Art for frame TV":
-            title_lower = data.get("Title", "").lower()
-            tags_lower = [t.lower() for t in data.get("Tags", [])]
-            
-            for word in FORBIDDEN_TV_WORDS:
-                if word in title_lower:
-                    errors.append(f"CRITICAL: The word '{word}' is strictly FORBIDDEN in the Title for Frame TV mode.")
-                for tag in tags_lower:
-                    if word in tag:
-                        errors.append(f"CRITICAL: The word '{word}' is strictly FORBIDDEN in Tags. You illegally used it in the tag '{tag}'.")
-
-        # ----------------------------------------------------
-        # 2. اعتبارسنجی اتریبیوت‌ها
-        # ----------------------------------------------------
-        attrs = data.get("Attributes", {})
-        
-        if attrs.get("1st Main Color") not in ALLOWED_COLORS: errors.append(f"1st Main Color '{attrs.get('1st Main Color')}' is not in list.")
-        if attrs.get("2nd Main Color") not in ALLOWED_COLORS: errors.append(f"2nd Main Color '{attrs.get('2nd Main Color')}' is not in list.")
-        if attrs.get("Home Style") not in ALLOWED_STYLES: errors.append(f"Home Style '{attrs.get('Home Style')}' is not in list.")
-        if attrs.get("Celebration") not in ALLOWED_CELEBS: errors.append(f"Celebration '{attrs.get('Celebration')}' is not in list. You MUST pick one.")
-        if attrs.get("Occasion") not in ALLOWED_OCCASIONS: errors.append(f"Occasion '{attrs.get('Occasion')}' is not in list. You MUST pick one.")
-        
-        subjs = attrs.get("Subject", [])
-        if isinstance(subjs, str): subjs = [subjs]
-        for s in subjs:
-            if s not in ALLOWED_SUBJECTS: errors.append(f"Subject '{s}' is not allowed.")
-            
-        rooms = attrs.get("Room", [])
-        if isinstance(rooms, str): rooms = [rooms]
-        for r in rooms:
-            if r not in ALLOWED_ROOMS: errors.append(f"Room '{r}' is not allowed.")
-
-        # اگر خطایی نبود، خروجی تایید می‌شود
-        if not errors:
-            return data
-            
-        # در صورت خطا، پایتون به هوش مصنوعی تذکر می‌دهد و مجدد تلاش می‌کند
-        st.toast(f"Checking AI compliance (Attempt {attempt+1})... Correcting forbidden words/attributes.")
-        current_prompt = base_prompt + "\n\nCRITICAL ERROR IN PREVIOUS ATTEMPT:\nYou violated the strict rules. Fix these errors immediately:\n" + "\n".join(errors)
-
-    return data
+    try:
+        full_data = json.loads(raw_text)
+        # فقط بخش نهایی سئو را برمی‌گردانیم تا در ظاهر سایت نمایش داده شود
+        return full_data.get("Final_SEO", full_data)
+    except Exception as e:
+        raise Exception("Failed to parse AI output. AI format was incorrect.")
 
 # ==========================================
 # 5. Main Dashboard
@@ -263,7 +222,7 @@ else:
                 st.session_state['current_image'] = img
                 st.session_state['product_type'] = p_type
                 st.session_state['user_desc'] = u_desc
-                with st.spinner("Atlas AI is generating and validating Etsy rules..."):
+                with st.spinner("Atlas AI is generating and performing internal audit..."):
                     try:
                         st.session_state['generated_data'] = generate_seo_logic(img, p_type, u_desc, api_key)
                         st.rerun()
@@ -274,7 +233,7 @@ else:
         data = st.session_state['generated_data']
         if st.session_state['current_image']: st.image(st.session_state['current_image'], width=150)
             
-        st.success("✅ SEO Generated & Validated!")
+        st.success("✅ SEO Generated & Audited Successfully!")
         st.markdown("---")
         
         title_val = data.get('Title', '')
@@ -312,8 +271,11 @@ else:
         with c1:
             if st.button("✨ Apply Changes"):
                 with st.spinner("Applying revisions..."):
-                    st.session_state['generated_data'] = generate_seo_logic(st.session_state['current_image'], st.session_state['product_type'], st.session_state['user_desc'], api_key, rev_text)
-                    st.rerun()
+                    try:
+                        st.session_state['generated_data'] = generate_seo_logic(st.session_state['current_image'], st.session_state['product_type'], st.session_state['user_desc'], api_key, rev_text)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
         with c2:
             if st.button("🗑️ Start Over"):
                 st.session_state['generated_data'] = None
