@@ -104,11 +104,13 @@ if uploaded_file is not None:
                 # CSV DATA (Opportunity Keywords):
                 [{csv_context}]
 
-                # ATTRIBUTE REPOSITORY (STRICT USE ONLY)
+                # ATTRIBUTE REPOSITORY (STRICT USE ONLY - YOU MUST FILL EVERY FIELD):
                 - COLORS: Beige, Black, Blue, Bronze, Brown, Clear, Copper, Gold, Grey, Green, Orange, Pink, Purple, Rainbow, Red, Rose gold, Silver, White, Yellow
                 - HOME STYLE: Art deco, Art nouveau, Bohemian & eclectic, Coastal & tropical, Contemporary, Country & farmhouse, Gothic, Industrial & utility, Lodge, Mid-century, Minimalist, Rustic & primitive, Southwestern, Victorian
                 - SUBJECT: Abstract, Animal, Architecture, Astronomy, Botanical, Coastal, Fantasy, Floral, Food & drink, Geometric, Landscape, Minimalist, Nautical, People, Quote & saying, Still life, Transportation
                 - ROOMS (Pick 5): Bathroom, Bedroom, Dorm, Entryway, Game room, Kids, Kitchen & dining, Laundry, Living room, Nursery, Office
+                - CELEBRATION (Must Pick 1): Christmas, Easter, Halloween, Mother's Day, Valentine's Day, Thanksgiving, Father's Day, Independence Day (If none perfectly fits, pick the closest vibe).
+                - OCCASION (Must Pick 1): Anniversary, Birthday, Graduation, Housewarming, Wedding, Baby Shower, Bridal Shower, Engagement (For generic art, default to "Housewarming" or "Birthday").
 
                 # OUTPUT STRUCTURE (COPY-PASTE READY)
                 Return the output in this EXACT format. Use these exact headers so the system can parse them:
@@ -122,8 +124,8 @@ if uploaded_file is not None:
                 1st Main Color: [Value]
                 2nd Main Color: [Value]
                 Home Style: [Value]
-                Celebration: [Value or Blank]
-                Occasion: [Value or Blank]
+                Celebration: [Mandatory Value - Pick from list]
+                Occasion: [Mandatory Value - Pick from list]
                 Subject: [Up to 3 Values]
                 Room: [5 Values]
                 Tags: [13 comma-separated phrases, NO single words, ALL under 20 chars]
@@ -131,6 +133,7 @@ if uploaded_file is not None:
                 # QUALITY CONTROL LOCKS
                 - No emojis, no conversational fillers.
                 - Titles < 100 characters, no word repetition.
+                - ALL ATTRIBUTES MUST BE FILLED. Never leave Celebration or Occasion blank.
                 """
                 
                 model = genai.GenerativeModel('gemini-2.5-flash')
