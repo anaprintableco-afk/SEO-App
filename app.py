@@ -13,8 +13,12 @@ st.set_page_config(page_title="Etsy SEO Pro AI", page_icon="📈", layout="cente
 LINK_TO_BUY = "https://your-gumroad-link.com"
 PREMIUM_UPGRADE_CODE = "PRO-ETSY-500"
 
-# خواندن کلید API به صورت مخفی از گاوصندوق Streamlit
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+# خواندن کلید API از گاوصندوق Streamlit
+try:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+except Exception as e:
+    st.error("خطا در خواندن کلید API از Secrets. لطفاً مطمئن شوید کلید را درست وارد کرده‌اید.")
+    st.stop()
 
 # ==========================================
 # سیستم دیتابیس کاربران
@@ -127,8 +131,30 @@ if uploaded_file is not None:
     st.image(image, caption="عکس محصول شما", use_container_width=True)
     
     if st.button("✨ پردازش هوشمند (کسر ۱ اعتبار)"):
-        with st.spinner("در حال تحلیل و تطبیق با دیتابیس..."):
+        with st.spinner("در حال ارتباط با سرور گوگل و تحلیل عکس..."):
+            valid_models = []
             try:
+                # رادار هوشمند: پیدا کردن مدل‌های فعال روی کلید شما
+                for m in genai.list_models():
+                    if 'generateContent' in m.supported_generation_methods:
+                        valid_models.append(m.name)
+                
+                # انتخاب بهترین مدل تصویری
+                target_model = None
+                for pref in ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro-vision', 'gemini-pro']:
+                    for vm in valid_models:
+                        if pref in vm:
+                            target_model = vm
+                            break
+                    if target_model:
+                        break
+                
+                if not target_model and valid_models:
+                    target_model = valid_models[0] # اگر هیچکدام نبود، اولین مدل لیست را بردار
+                    
+                target_model_clean = target_model.replace('models/', '') if target_model else 'gemini-1.5-flash'
+
+                # خواندن دیتابیس
                 df = pd.read_csv('MASTER_API_DATA.csv')
                 df['Avg_Searches'] = pd.to_numeric(df['Avg_Searches'], errors='coerce').fillna(0)
                 df['Competition'] = pd.to_numeric(df['Competition'], errors='coerce').fillna(1)
@@ -158,17 +184,19 @@ if uploaded_file is not None:
                 Tags: [13 Tags]
                 """
                 
-                # رفع ارور نام مدل با اضافه کردن latest
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                model = genai.GenerativeModel(target_model_clean)
                 response = model.generate_content([prompt, image])
                 
                 st.success("✅ سئو با موفقیت انجام شد!")
-                st.text_area("کپی کنید:", value=response.text, height=400)
+                st.text_area("خروجی نهایی:", value=response.text, height=400)
                 
                 users_db[current_email]["credits"] -= 1
                 save_users(users_db)
                 st.info(f"🪙 یک اعتبار مصرف شد. اعتبارهای باقیمانده شما: {users_db[current_email]['credits']}")
                 
             except Exception as e:
-                st.error(f"خطایی رخ داد: {e}")
-
+                st.error(f"❌ خطایی رخ داد: {e}")
+                if valid_models:
+                    st.warning(f"مدل‌های فعال شناسایی شده روی اکانت شما: {valid_models}")
+                else:
+                    st.warning("هیچ مدلی روی این کلید API شناسایی نشد. مطمئن شوید کلید API را درست کپی کرده‌اید.")
