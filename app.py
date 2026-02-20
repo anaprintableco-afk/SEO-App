@@ -20,11 +20,21 @@ st.markdown("""
             color: white !important; font-weight: bold; border: none; padding: 10px;
         }
         .box-title { color: #FF5A1F !important; font-size: 1.2em; font-weight: bold; margin-top: 15px; margin-bottom: 5px; }
-        .result-box { background-color: #161b22; padding: 15px; border-radius: 8px; border: 1px solid #30363d; margin-bottom: 15px; }
+        /* استایل برای باکس‌های متنی استریم‌لیت */
+        .stTextArea textarea, .stTextInput input {
+            background-color: #161b22 !important;
+            color: #ffffff !important;
+            border: 1px solid #30363d !important;
+            border-radius: 8px !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
-if 'auth' not in st.session_state: st.session_state['auth'] = False
+# مقداردهی اولیه متغیرهای سشن (برای اینکه با ویرایش کاربر، اطلاعات غیب نشوند)
+if 'auth' not in st.session_state: 
+    st.session_state['auth'] = False
+if 'generated_data' not in st.session_state:
+    st.session_state['generated_data'] = None
 
 # ==========================================
 # 2. CSV Loader
@@ -32,7 +42,6 @@ if 'auth' not in st.session_state: st.session_state['auth'] = False
 def load_csv_keywords():
     try:
         df = pd.read_csv("MASTER_API_DATA.csv")
-        # فرض میکنیم اسم ستون Keyword است
         keywords = df['Keyword'].head(50).tolist()
         return ", ".join(str(k) for k in keywords)
     except Exception:
@@ -52,59 +61,76 @@ else:
     st.sidebar.markdown("<h2>AtlasRank Pro</h2>", unsafe_allow_html=True)
     if st.sidebar.button("Logout"):
         st.session_state['auth'] = False
+        st.session_state['generated_data'] = None
         st.rerun()
 
     st.title("🛠️ AI SEO Optimizer")
-    st.info("Upload image -> Process with CSV -> Validate Etsy Rules.")
+    
+    # -----------------------------------------
+    # بخش دریافت اطلاعات از کاربر (پیش از تولید)
+    # -----------------------------------------
+    st.markdown("<div class='box-title'>1. Select Product Type</div>", unsafe_allow_html=True)
+    product_type = st.radio("What type of product is this?", 
+                            ["Art for frame TV", "Printable Wall Art"], 
+                            horizontal=True, label_visibility="collapsed")
+    
+    st.markdown("<div class='box-title'>2. Describe Your Product (Optional)</div>", unsafe_allow_html=True)
+    user_desc = st.text_area("Write anything about your product in any language...", 
+                             placeholder="مثال: این یک تابلوی نقاشی آبرنگ از گل رز صورتی است...", height=80)
+    
+    st.markdown("<div class='box-title'>3. Upload Image</div>", unsafe_allow_html=True)
+    up = st.file_uploader("", type=["jpg", "png", "jpeg"], label_visibility="collapsed")
     
     api_key = os.environ.get("GEMINI_API_KEY")
     genai.configure(api_key=api_key)
     
-    up = st.file_uploader("Upload Product Photo", type=["jpg", "png", "jpeg"])
-    
     if up:
         img = Image.open(up)
-        st.image(img, width=300)
+        st.image(img, width=250)
         
-        if st.button("Generate Optimized Listing"):
-            with st.spinner("Applying strict Etsy Handbook rules..."):
+        if st.button("Analyze & Generate SEO"):
+            with st.spinner("Atlas AI is crafting your masterpiece..."):
                 try:
                     csv_data = load_csv_keywords()
                     model = genai.GenerativeModel('models/gemini-2.5-flash')
                     
-                    # پرامپت طلایی شما + خروجی جیسون
+                    # پرامپت با اضافه شدن توضیحات کاربر و نوع محصول
                     prompt = f"""
                     # IDENTITY & AUTHORITY
-                    You are the Core SEO Engine of an automated Etsy listing service. Your primary mission is to transform user inputs into high-converting, SEO-optimized listings.
+                    You are the Core SEO Engine of an automated Etsy listing service. 
 
+                    # USER INPUTS (CRITICAL CONTEXT)
+                    - Product Category: {product_type}
+                    - Seller's Custom Description: {user_desc if user_desc else 'None provided'}
+                    
                     # ETSY SELLER HANDBOOK RULES (UPDATED CRITICAL GUIDELINES):
                     1. TITLE NEW GUIDELINES: 
                        - Write clear, scannable titles (preferably under 15 words).
                        - NEVER repeat words or phrases in the title. State what the item is EXACTLY ONCE.
-                       - REMOVE all subjective words (e.g., "beautiful", "perfect") and gifting phrases (e.g., "gift for him").
+                       - REMOVE all subjective words (e.g., "beautiful", "perfect").
                        - Put the most important traits (color, material, style) at the very beginning.
                     2. TAGGING RULES:
                        - NO SINGLE-WORD TAGS. All 13 tags MUST be multi-word long-tail phrases.
                        - STRICT 20-CHARACTER LIMIT: You MUST count characters. Tags cannot exceed 20 characters.
-                       - DIVERSIFY: Do not repeat the same root word (e.g., if you use "octopus print", do not use "octopus art").
+                       - DIVERSIFY: Do not repeat the same root word.
                     3. DESCRIPTION RULES:
-                       - The first sentence MUST clearly describe the item using a natural, human-sounding voice. NEVER just copy/paste the title into the first line.
+                       - The first sentence MUST clearly describe the item using a natural voice. 
 
                     # OPERATIONAL PROTOCOL
-                    1. CSV ANALYSIS: Analyze the provided CSV Opportunity Score below. Prioritize these high-opportunity keywords BUT ensure they fit the 20-character limit and are NOT single words.
-                    2. IMAGE RECOGNITION: Strictly describe only what is visible in the uploaded image.
+                    1. CSV ANALYSIS: Analyze the provided CSV Opportunity Score below. Prioritize these high-opportunity keywords.
+                    2. IMAGE RECOGNITION: Describe what is visible in the uploaded image, combining it with the seller's custom description.
 
                     # CSV DATA (Opportunity Keywords):
                     [{csv_data}]
 
-                    # ATTRIBUTE REPOSITORY (STRICT USE ONLY)
+                    # ATTRIBUTE REPOSITORY
                     - COLORS: Beige, Black, Blue, Bronze, Brown, Clear, Copper, Gold, Grey, Green, Orange, Pink, Purple, Rainbow, Red, Rose gold, Silver, White, Yellow
-                    - HOME STYLE: Art deco, Art nouveau, Bohemian & eclectic, Coastal & tropical, Contemporary, Country & farmhouse, Gothic, Industrial & utility, Lodge, Mid-century, Minimalist, Rustic & primitive, Southwestern, Victorian
-                    - SUBJECT: Abstract, Animal, Architecture, Astronomy, Botanical, Coastal, Fantasy, Floral, Food & drink, Geometric, Landscape, Minimalist, Nautical, People, Quote & saying, Still life, Transportation
-                    - ROOMS (Pick 5): Bathroom, Bedroom, Dorm, Entryway, Game room, Kids, Kitchen & dining, Laundry, Living room, Nursery, Office
+                    - HOME STYLE: Art deco, Art nouveau, Bohemian, Coastal, Contemporary, Farmhouse, Gothic, Industrial, Lodge, Mid-century, Minimalist, Rustic, Southwestern, Victorian
+                    - SUBJECT: Abstract, Animal, Architecture, Astronomy, Botanical, Coastal, Fantasy, Floral, Geometric, Landscape, Minimalist, Nautical, People, Quote, Still life
+                    - ROOMS: Bathroom, Bedroom, Dorm, Entryway, Game room, Kids, Kitchen, Laundry, Living room, Nursery, Office
 
                     # OUTPUT STRUCTURE (JSON FORMAT REQUIRED)
-                    Return the output ONLY as a valid JSON object. No markdown, no extra text. Use these exact keys:
+                    Return the output ONLY as a valid JSON object:
                     {{
                         "Title": "...",
                         "Description": "...",
@@ -120,47 +146,58 @@ else:
                         }},
                         "Tags": ["tag1", "tag2", "tag3", "tag4", "tag5", "tag6", "tag7", "tag8", "tag9", "tag10", "tag11", "tag12", "tag13"]
                     }}
-
-                    # QUALITY CONTROL LOCKS
-                    - No emojis, no conversational fillers.
-                    - Titles < 100 characters, no word repetition.
                     """
                     
                     response = model.generate_content([prompt, img])
-                    
-                    # تمیز کردن خروجی برای خواندن جیسون
                     raw_text = response.text.replace('```json', '').replace('```', '').strip()
-                    data = json.loads(raw_text)
                     
+                    # ذخیره در سشن برای جلوگیری از پاک شدن هنگام ویرایش
+                    st.session_state['generated_data'] = json.loads(raw_text)
                     st.success("✅ SEO Generated Successfully!")
                     
-                    # ==========================================
-                    # نمایش در باکس‌های مجزا
-                    # ==========================================
-                    st.markdown("<div class='box-title'>📌 Optimized Title</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='result-box'>{data.get('Title', '')}</div>", unsafe_allow_html=True)
-                    
-                    st.markdown("<div class='box-title'>🏷️ 13 SEO Tags</div>", unsafe_allow_html=True)
-                    tags = data.get('Tags', [])
-                    st.markdown(f"<div class='result-box'>{', '.join(tags)}</div>", unsafe_allow_html=True)
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.markdown("<div class='box-title'>⚙️ Item Attributes</div>", unsafe_allow_html=True)
-                        st.json(data.get('Attributes', {}))
-                    with col2:
-                        st.markdown("<div class='box-title'>🖼️ Alt Texts (10 lines)</div>", unsafe_allow_html=True)
-                        alts = data.get('AltTexts', [])
-                        for i, alt in enumerate(alts, 1):
-                            st.write(f"{i}. {alt}")
-                            
-                    st.markdown("<div class='box-title'>📝 Product Description</div>", unsafe_allow_html=True)
-                    st.text_area("", value=data.get('Description', ''), height=200, label_visibility="collapsed")
-                    
-                    st.balloons()
-                    
-                except json.JSONDecodeError:
-                    st.error("JSON Error: The AI format was incorrect. Raw output:")
-                    st.write(response.text)
                 except Exception as e:
                     st.error(f"Error: {e}")
+
+    # -----------------------------------------
+    # نمایش نتایج (قابل ویرایش و تفکیک شده)
+    # -----------------------------------------
+    if st.session_state['generated_data']:
+        data = st.session_state['generated_data']
+        
+        st.markdown("---")
+        
+        # 1. تایتل با قابلیت ویرایش
+        title_val = data.get('Title', '')
+        st.markdown(f"<div class='box-title'>📌 Optimized Title</div>", unsafe_allow_html=True)
+        # استفاده از text_area تا کاربر بتواند کم و زیاد کند
+        st.text_area(f"Length: {len(title_val)} chars (Editable)", value=title_val, height=68, key="edit_title")
+        
+        # 2. تگ‌ها (همراه با شمارنده و باکس کپی مجزا)
+        st.markdown("<div class='box-title'>🏷️ 13 SEO Tags</div>", unsafe_allow_html=True)
+        tags_list = data.get('Tags', [])
+        
+        # ساخت فرمت: تگ (تعداد کاراکتر)
+        tags_with_counts = [f"{t} ({len(t)})" for t in tags_list]
+        st.info(" | ".join(tags_with_counts)) # نمایش تگ‌ها با شمارنده
+        
+        # باکس مجزا فقط برای کپی کردن تگ‌های تمیز
+        st.text_area("Copy Tags (Comma separated):", value=", ".join(tags_list), height=68)
+        
+        # 3. اتریبیوت‌ها در فیلدهای جداگانه
+        st.markdown("<div class='box-title'>⚙️ Item Attributes</div>", unsafe_allow_html=True)
+        attr_cols = st.columns(3)
+        col_idx = 0
+        for key, val in data.get('Attributes', {}).items():
+            with attr_cols[col_idx % 3]:
+                st.text_input(key, value=val)
+            col_idx += 1
+            
+        # 4. Alt Texts در یک باکس قابل ویرایش
+        st.markdown("<div class='box-title'>🖼️ Alt Texts (10 Options)</div>", unsafe_allow_html=True)
+        alts = data.get('AltTexts', [])
+        alt_text_str = "\n".join([f"{i+1}. {alt}" for i, alt in enumerate(alts)])
+        st.text_area("Select and copy one of the following:", value=alt_text_str, height=250)
+            
+        # 5. توضیحات
+        st.markdown("<div class='box-title'>📝 Product Description</div>", unsafe_allow_html=True)
+        st.text_area("Editable Description:", value=data.get('Description', ''), height=300)
