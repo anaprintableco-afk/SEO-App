@@ -38,7 +38,7 @@ if uploaded_file is not None:
     st.image(image, caption="عکس محصول شما", use_container_width=True)
     
     if st.button("🚀 پردازش و تولید سئو"):
-        with st.spinner("در حال تحلیل عکس، بررسی قوانین هندبوک و استخراج دیتای CSV..."):
+        with st.spinner("در حال تحلیل عکس، اعمال قوانین سخت‌گیرانه اتسی و تطبیق با CSV..."):
             try:
                 # خواندن کلمات کلیدی از فایل CSV
                 df = pd.read_csv('MASTER_API_DATA.csv')
@@ -54,18 +54,23 @@ if uploaded_file is not None:
                 if "TV" in product_mode:
                     mode_instruction = '- MODE 1 (TV): Focus on "Digital Display". Prohibited words: print, paper, shipping, canvas, poster.'
                 else:
-                    mode_instruction = '- MODE 2 (Printable): Focus on "Digital Download". Allowed words: printable, digital print, instant download.'
+                    mode_instruction = '- MODE 2 (Printable): Focus on "Digital Download". Use multi-word phrases like "printable wall art" or "instant download art". (NEVER use single words like "printable" or "art").'
 
-                # پرامپت دقیق و سخت‌گیرانه شما
+                # پرامپت دقیق، خشن و منطبق بر هندبوک اتسی
                 prompt = f"""
                 # IDENTITY & AUTHORITY
-                You are the Core SEO Engine of an automated Etsy listing service. Your primary mission is to transform user inputs (images and descriptions) into high-converting, SEO-optimized listings for Printables and Frame TV Art.
+                You are the Core SEO Engine of an automated Etsy listing service. Your primary mission is to transform user inputs into high-converting, SEO-optimized listings.
 
-                # OPERATIONAL PROTOCOL (MANDATORY STEPS)
-                1. BROWSE & SYNC: Before every generation, access and retrieve the latest SEO rules from Etsy Seller Handbook.
-                2. CSV ANALYSIS: Analyze the provided CSV Opportunity Score to select the most effective tags.
-                3. IMAGE RECOGNITION: Strictly describe only what is visible in the uploaded image.
-                4. DOUBLE-CHECK: Before returning the final output, verify it against the Etsy Handbook rules (no keyword stuffing, character limits, prohibited words).
+                # ETSY SELLER HANDBOOK RULES (CRITICAL - YOU MUST OBEY):
+                1. NO SINGLE-WORD TAGS: NEVER use a single word as a tag (e.g., "printable", "art", "vintage"). ALL 13 tags MUST be multi-word phrases (e.g., "printable wall art", "vintage flower decor").
+                2. STRICT 20-CHARACTER LIMIT: You MUST physically count the characters of EVERY tag. A tag cannot exceed 20 characters (including spaces). 
+                   - Example BAD: "mid century modern art" (22 chars)
+                   - Example GOOD: "mid century art" (15 chars)
+                3. NO REPETITION STUFFING: Do not repeat the same root word in every tag. Mix your vocabulary.
+
+                # OPERATIONAL PROTOCOL
+                1. CSV ANALYSIS: Analyze the provided CSV Opportunity Score below. Prioritize these high-opportunity keywords BUT ensure they fit the 20-character limit and are NOT single words.
+                2. IMAGE RECOGNITION: Strictly describe only what is visible in the uploaded image.
 
                 # MODE-SPECIFIC LOGIC
                 {mode_instruction}
@@ -92,13 +97,12 @@ if uploaded_file is not None:
                 Occasion: [Value or Blank]
                 Subject: [Up to 3 Values]
                 Room: [5 Values]
-                Tags: [13 comma-separated keywords]
+                Tags: [13 comma-separated phrases, NO single words, ALL under 20 chars]
                 Section: [Value]
 
                 # QUALITY CONTROL LOCKS
                 - No emojis, no conversational fillers.
                 - Titles < 100 characters.
-                - Tags < 20 characters each.
                 - Descriptions < 400 characters.
                 """
                 
