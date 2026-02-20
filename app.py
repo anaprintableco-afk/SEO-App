@@ -76,15 +76,23 @@ if uploaded_file is not None:
                 else:
                     mode_instruction = '- MODE 2 (Printable): Focus on "Digital Download". Use multi-word phrases like "printable wall art" or "instant download art". (NEVER use single words like "printable" or "art").'
 
+                
                 prompt = f"""
                 # IDENTITY & AUTHORITY
                 You are the Core SEO Engine of an automated Etsy listing service. Your primary mission is to transform user inputs into high-converting, SEO-optimized listings.
 
-                # ETSY SELLER HANDBOOK RULES (CRITICAL - YOU MUST OBEY):
-                1. NO SINGLE-WORD TAGS: NEVER use a single word as a tag. ALL 13 tags MUST be multi-word phrases.
-                2. STRICT 20-CHARACTER LIMIT: You MUST physically count the characters of EVERY tag. A tag cannot exceed 20 characters (including spaces). 
-                3. NO REPETITION STUFFING: Do not repeat the same root word in every tag. Mix your vocabulary.
-                4. ALT TEXTS FORMAT: You must provide exactly 10 alt texts, numbered strictly from 1 to 10.
+                # ETSY SELLER HANDBOOK RULES (UPDATED CRITICAL GUIDELINES):
+                1. TITLE NEW GUIDELINES: 
+                   - Write clear, scannable titles (preferably under 15 words).
+                   - NEVER repeat words or phrases in the title. State what the item is EXACTLY ONCE.
+                   - REMOVE all subjective words (e.g., "beautiful", "perfect") and gifting phrases (e.g., "gift for him").
+                   - Put the most important traits (color, material, style) at the very beginning.
+                2. TAGGING RULES:
+                   - NO SINGLE-WORD TAGS. All 13 tags MUST be multi-word long-tail phrases.
+                   - STRICT 20-CHARACTER LIMIT: You MUST count characters. Tags cannot exceed 20 characters.
+                   - DIVERSIFY: Do not repeat the same root word (e.g., if you use "octopus print", do not use "octopus art").
+                3. DESCRIPTION RULES:
+                   - The first sentence MUST clearly describe the item using a natural, human-sounding voice. NEVER just copy/paste the title into the first line.
 
                 # OPERATIONAL PROTOCOL
                 1. CSV ANALYSIS: Analyze the provided CSV Opportunity Score below. Prioritize these high-opportunity keywords BUT ensure they fit the 20-character limit and are NOT single words.
@@ -122,8 +130,7 @@ if uploaded_file is not None:
 
                 # QUALITY CONTROL LOCKS
                 - No emojis, no conversational fillers.
-                - Titles < 100 characters.
-                - Descriptions < 400 characters.
+                - Titles < 100 characters, no word repetition.
                 """
                 
                 model = genai.GenerativeModel('gemini-2.5-flash')
