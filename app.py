@@ -13,6 +13,9 @@ st.set_page_config(page_title="Etsy SEO Pro AI", page_icon="📈", layout="cente
 LINK_TO_BUY = "https://your-gumroad-link.com"
 PREMIUM_UPGRADE_CODE = "PRO-ETSY-500"
 
+# خواندن کلید API به صورت مخفی از گاوصندوق Streamlit
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+
 # ==========================================
 # سیستم دیتابیس کاربران
 # ==========================================
@@ -117,58 +120,54 @@ if user_data["credits"] <= 0:
 st.markdown("---")
 st.subheader("🖼️ آپلود محصول و تولید تگ")
 
-API_KEY = st.text_input("🔑 کلید API جمنای خود را وارد کنید:", type="password")
+uploaded_file = st.file_uploader("عکس محصول خود را آپلود کنید", type=["jpg", "jpeg", "png"])
 
-if API_KEY:
-    genai.configure(api_key=API_KEY)
+if uploaded_file is not None:
+    image = Image.open(uploaded_file)
+    st.image(image, caption="عکس محصول شما", use_container_width=True)
     
-    uploaded_file = st.file_uploader("عکس محصول خود را آپلود کنید", type=["jpg", "jpeg", "png"])
-    
-    if uploaded_file is not None:
-        image = Image.open(uploaded_file)
-        st.image(image, caption="عکس محصول شما", use_container_width=True)
-        
-        if st.button("✨ پردازش هوشمند (کسر ۱ اعتبار)"):
-            with st.spinner("در حال تحلیل و تطبیق با دیتابیس..."):
-                try:
-                    df = pd.read_csv('MASTER_API_DATA.csv') # نام فایل تصحیح شد
-                    df['Avg_Searches'] = pd.to_numeric(df['Avg_Searches'], errors='coerce').fillna(0)
-                    df['Competition'] = pd.to_numeric(df['Competition'], errors='coerce').fillna(1)
-                    df['Opportunity'] = df['Avg_Searches'] / df['Competition']
-                    
-                    top_keywords = df.sort_values(by='Opportunity', ascending=False).head(300)['Keyword'].tolist()
-                    csv_context = ", ".join(str(x) for x in top_keywords)
-                    
-                    prompt = f"""
-                    # ROLE: Etsy SEO Strategist & Optimizer (Digital Products)
+    if st.button("✨ پردازش هوشمند (کسر ۱ اعتبار)"):
+        with st.spinner("در حال تحلیل و تطبیق با دیتابیس..."):
+            try:
+                df = pd.read_csv('MASTER_API_DATA.csv')
+                df['Avg_Searches'] = pd.to_numeric(df['Avg_Searches'], errors='coerce').fillna(0)
+                df['Competition'] = pd.to_numeric(df['Competition'], errors='coerce').fillna(1)
+                df['Opportunity'] = df['Avg_Searches'] / df['Competition']
+                
+                top_keywords = df.sort_values(by='Opportunity', ascending=False).head(300)['Keyword'].tolist()
+                csv_context = ", ".join(str(x) for x in top_keywords)
+                
+                prompt = f"""
+                # ROLE: Etsy SEO Strategist & Optimizer (Digital Products)
 
-                    # CORE KNOWLEDGE BASES:
-                    1. INTERNAL: Your pre-trained knowledge of global search trends.
-                    2. COMPLIANCE: Strictly adhere to the Etsy Seller Handbook rules.
-                    3. DATA-DRIVEN: Use this list of high-opportunity keywords: [{csv_context}]
+                # CORE KNOWLEDGE BASES:
+                1. INTERNAL: Your pre-trained knowledge of global search trends.
+                2. COMPLIANCE: Strictly adhere to the Etsy Seller Handbook rules.
+                3. DATA-DRIVEN: Use this list of high-opportunity keywords: [{csv_context}]
 
-                    # PROCESSING PIPELINE:
-                    1. CREATIVE GENERATION: Analyze the image and generate high-intent Title and 13 Tags.
-                    2. HANDBOOK VERIFICATION: Title < 100 chars, Tags < 20 chars, No keyword stuffing.
-                    3. CSV CROSS-OPTIMIZATION: Compare generated tags with the CSV list. REPLACE generic tags with highly relevant CSV tags that have better Opportunity Ratios. Target a mix of 70% CSV data / 30% image-specific tags.
-                    4. FINAL AUDIT: Ensure 13 unique tags and no prohibited words.
+                # PROCESSING PIPELINE:
+                1. CREATIVE GENERATION: Analyze the image and generate high-intent Title and 13 Tags.
+                2. HANDBOOK VERIFICATION: Title < 100 chars, Tags < 20 chars, No keyword stuffing.
+                3. CSV CROSS-OPTIMIZATION: Compare generated tags with the CSV list. REPLACE generic tags with highly relevant CSV tags that have better Opportunity Ratios. Target a mix of 70% CSV data / 30% image-specific tags.
+                4. FINAL AUDIT: Ensure 13 unique tags and no prohibited words.
 
-                    # OUTPUT FORMAT:
-                    Title: [Title]
-                    Description: [Description]
-                    Alt Texts: [10 Alt Texts]
-                    Tags: [13 Tags]
-                    """
-                    
-                    model = genai.GenerativeModel('gemini-1.5-flash')
-                    response = model.generate_content([prompt, image])
-                    
-                    st.success("✅ سئو با موفقیت انجام شد!")
-                    st.text_area("کپی کنید:", value=response.text, height=400)
-                    
-                    users_db[current_email]["credits"] -= 1
-                    save_users(users_db)
-                    st.info(f"🪙 یک اعتبار مصرف شد. اعتبارهای باقیمانده شما: {users_db[current_email]['credits']}")
-                    
-                except Exception as e:
-                    st.error(f"خطایی رخ داد: بررسی کنید فایل CSV آپلود شده باشد.\n جزئیات خطا: {e}")
+                # OUTPUT FORMAT:
+                Title: [Title]
+                Description: [Description]
+                Alt Texts: [10 Alt Texts]
+                Tags: [13 Tags]
+                """
+                
+                # رفع ارور نام مدل با اضافه کردن latest
+                model = genai.GenerativeModel('gemini-1.5-pro-latest')
+                response = model.generate_content([prompt, image])
+                
+                st.success("✅ سئو با موفقیت انجام شد!")
+                st.text_area("کپی کنید:", value=response.text, height=400)
+                
+                users_db[current_email]["credits"] -= 1
+                save_users(users_db)
+                st.info(f"🪙 یک اعتبار مصرف شد. اعتبارهای باقیمانده شما: {users_db[current_email]['credits']}")
+                
+            except Exception as e:
+                st.error(f"خطایی رخ داد: {e}")
