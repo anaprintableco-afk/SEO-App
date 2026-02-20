@@ -19,14 +19,12 @@ st.markdown("""
             font-family: 'Noto Sans Display', sans-serif !important;
         }
         
-        /* Making text areas look sleeker */
         .stTextArea textarea {
             font-size: 16px !important;
             line-height: 1.5 !important;
             border-radius: 8px !important;
         }
         
-        /* Style for section headers */
         h1, h2, h3 {
             font-weight: 600 !important;
             letter-spacing: -0.5px !important;
@@ -59,7 +57,7 @@ uploaded_file = st.file_uploader("Upload Product Image", type=["jpg", "jpeg", "p
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
-    st.image(image, caption="Uploaded Image", use_container_width=True)
+    st.image(image, caption="Uploaded Image Preview", width=300)
     
     if st.button("Generate SEO Data"):
         with st.spinner("Loading..."):
@@ -103,7 +101,6 @@ if uploaded_file is not None:
                 - HOME STYLE: Art deco, Art nouveau, Bohemian & eclectic, Coastal & tropical, Contemporary, Country & farmhouse, Gothic, Industrial & utility, Lodge, Mid-century, Minimalist, Rustic & primitive, Southwestern, Victorian
                 - SUBJECT: Abstract, Animal, Architecture, Astronomy, Botanical, Coastal, Fantasy, Floral, Food & drink, Geometric, Landscape, Minimalist, Nautical, People, Quote & saying, Still life, Transportation
                 - ROOMS (Pick 5): Bathroom, Bedroom, Dorm, Entryway, Game room, Kids, Kitchen & dining, Laundry, Living room, Nursery, Office
-                - SECTIONS: Tapestry | Rug, Fall | Halloween | Dark, Floral | Nursery| Animal, Winter | Christmas, Frame TV Art, Spring | Easter | Valen, Portrait | People, Summer | Coastal, Kitchen, Abstract, Architecture | Cityscape, Christian
 
                 # OUTPUT STRUCTURE (COPY-PASTE READY)
                 Return the output in this EXACT format. Use these exact headers so the system can parse them:
@@ -122,7 +119,6 @@ if uploaded_file is not None:
                 Subject: [Up to 3 Values]
                 Room: [5 Values]
                 Tags: [13 comma-separated phrases, NO single words, ALL under 20 chars]
-                Section: [Value]
 
                 # QUALITY CONTROL LOCKS
                 - No emojis, no conversational fillers.
@@ -133,9 +129,6 @@ if uploaded_file is not None:
                 model = genai.GenerativeModel('gemini-2.5-flash')
                 response = model.generate_content([prompt, image])
                 raw_text = response.text
-                
-                st.success("SEO Data Extracted Successfully.")
-                st.markdown("---")
                 
                 def extract_section(text, current_header, next_header):
                     try:
@@ -148,7 +141,7 @@ if uploaded_file is not None:
                     except ValueError:
                         return ""
 
-                # Extracting data based on exact headers
+                # Extracting initial data
                 title = extract_section(raw_text, "Title:", "Description:")
                 description = extract_section(raw_text, "Description:", "Alt Texts:")
                 alt_texts = extract_section(raw_text, "Alt Texts:", "1st Main Color:")
@@ -160,18 +153,51 @@ if uploaded_file is not None:
                 occ = extract_section(raw_text, "Occasion:", "Subject:")
                 subj = extract_section(raw_text, "Subject:", "Room:")
                 room = extract_section(raw_text, "Room:", "Tags:")
-                tags = extract_section(raw_text, "Tags:", "Section:")
-                section = extract_section(raw_text, "Section:", None)
+                raw_tags = extract_section(raw_text, "Tags:", None)
+
+                # ==========================================
+                # SAFETY NET: PYTHON POST-PROCESSING (QUALITY CONTROL)
+                # ==========================================
+                
+                # 1. Title Safety Check (<100 chars)
+                if len(title) > 100:
+                    title = title[:100].rsplit(' ', 1)[0] # Cuts at the last full word before 100 chars
+
+                # 2. Tags Safety Check (Max 13 tags, Max 20 chars each)
+                cleaned_tags_list = []
+                raw_tags = raw_tags.replace('\n', '').replace('[', '').replace(']', '')
+                parsed_tags = [t.strip() for t in raw_tags.split(',') if t.strip()]
+                
+                for t in parsed_tags:
+                    if len(t) > 20:
+                        # Try to keep words that fit under 20 chars
+                        words = t.split()
+                        fixed_tag = ""
+                        for w in words:
+                            if len(fixed_tag) + len(w) + (1 if fixed_tag else 0) <= 20:
+                                fixed_tag += (" " + w if fixed_tag else w)
+                        fixed_tag = fixed_tag.strip()
+                        if not fixed_tag: # If a single word is somehow > 20 chars
+                            fixed_tag = t[:20]
+                        cleaned_tags_list.append(fixed_tag)
+                    else:
+                        cleaned_tags_list.append(t)
+                
+                # Enforce exactly 13 tags limit
+                cleaned_tags_list = cleaned_tags_list[:13]
+                final_tags = ", ".join(cleaned_tags_list)
 
                 # ==========================================
                 # Display Results in Large Text Areas
                 # ==========================================
+                st.success("SEO Data Extracted & Validated Successfully.")
+                st.markdown("---")
                 
-                st.subheader("Title")
+                st.subheader(f"Title ({len(title)} chars)")
                 st.text_area("Copy Title:", value=title, height=100, label_visibility="collapsed")
                 
-                st.subheader("Tags (13)")
-                st.text_area("Copy Tags:", value=tags, height=120, label_visibility="collapsed")
+                st.subheader(f"Tags ({len(cleaned_tags_list)} Items - All under 20 chars)")
+                st.text_area("Copy Tags:", value=final_tags, height=120, label_visibility="collapsed")
                 
                 st.subheader("Description")
                 st.text_area("Copy Description:", value=description, height=300, label_visibility="collapsed")
@@ -190,7 +216,6 @@ if uploaded_file is not None:
                     st.text_input("2nd Main Color", value=c2)
                     st.text_input("Celebration", value=cel)
                     st.text_input("Subject", value=subj)
-                    st.text_input("Section", value=section)
 
             except Exception as e:
                 st.error(f"An error occurred: {e}")
