@@ -41,7 +41,17 @@ ALLOWED_COLORS = ["Beige", "Black", "Blue", "Bronze", "Brown", "Clear", "Copper"
 ALLOWED_STYLES = ["Art deco", "Art nouveau", "Bohemian & eclectic", "Coastal & tropical", "Contemporary", "Country & farmhouse", "Gothic", "Industrial & utility", "Lodge", "Mid-century", "Minimalist", "Rustic & primitive", "Southwestern", "Victorian"]
 ALLOWED_CELEBS = ["Christmas", "Cinco de Mayo", "Dia de los Muertos", "Diwali", "Easter", "Eid", "Father's Day", "Halloween", "Hanukkah", "Holi", "Independence Day", "Kwanzaa", "Lunar New Year", "Mardi Gras", "Mother's Day", "New Year's", "Passover", "Ramadan", "St Patrick's Day", "Thanksgiving", "Valentine's Day", "Veterans Day"]
 ALLOWED_OCCASIONS = ["1st birthday", "Anniversary", "Baby shower", "Stag party", "Hen party", "Back to school", "Baptism", "Bar & Bat Mitzvah", "Birthday", "Bridal shower", "Confirmation", "Divorce & breakup", "Engagement", "First Communion", "Graduation", "Grief & mourning", "Housewarming", "LGBTQ pride", "Moving", "Pet loss", "Retirement", "Wedding"]
-ALLOWED_SUBJECTS = ["Abstract", "Animal", "Architecture", "Astronomy", "Botanical", "Coastal", "Fantasy", "Floral", "Food & drink", "Geometric", "Landscape", "Minimalist", "Nautical", "People", "Quote & saying", "Still life", "Transportation"]
+ALLOWED_SUBJECTS = [
+    "Abstract & geometric", "Animal", "Anime & cartoon", "Architecture & cityscape", 
+    "Beach & tropical", "Bollywood", "Comics & manga", "Educational", "Fantasy & Sci Fi", 
+    "Fashion", "Flowers", "Food & drink", "Geography & locale", "Horror & gothic", 
+    "Humourous saying", "Inspirational saying", "Landscape & scenery", "LGBTQ pride", 
+    "Love & friendship", "Military", "Film", "Music", "Nautical", "Nudes", 
+    "Patriotic & flags", "People & portrait", "Pet portrait", "Phrase & saying", 
+    "Plants & trees", "Religious", "Science & tech", "Sports & fitness", 
+    "Stars & celestial", "Steampunk", "Superhero", "Travel & transportation", 
+    "TV", "Typography & symbols", "Video game", "Western & cowboy", "Zodiac"
+]
 ALLOWED_ROOMS = ["Bathroom", "Bedroom", "Dorm", "Entryway", "Game room", "Kids", "Kitchen & dining", "Laundry", "Living room", "Nursery", "Office"]
 
 # ==========================================
@@ -67,7 +77,6 @@ def generate_seo_logic(img, p_type, desc, api_key, revision_request=""):
     csv_file = get_or_upload_csv(api_key)
     model = genai.GenerativeModel('models/gemini-2.5-flash')
     
-    # تعیین قوانین بر اساس نوع محصول
     if p_type == "Art for frame TV":
         mode_rules = """
         # MODE 1 — TV (Samsung Frame TV Only)
@@ -116,6 +125,10 @@ def generate_seo_logic(img, p_type, desc, api_key, revision_request=""):
     
     {mode_rules}
 
+    # 📸 IMAGE CONTEXT EXTRACTION (CRITICAL):
+    - **ARTISTIC MEDIUM & STYLE:** Carefully examine the image to identify its EXACT artistic medium and style (whatever it may be: watercolor, oil painting, pencil sketch, line ink drawing, digital illustration, photography, vintage etching, etc.). You MUST explicitly include the accurately identified medium/style in your tags and description. If it uses multiple techniques, mention all of them. Do not use generic terms if a specific technique is visible.
+    - **SEASON & LOCATION:** Identify any visible season, holiday, or location and include them.
+
     # TAGGING RULES (CRITICAL):
     - Exactly 13 tags. NO SINGLE-WORD TAGS. Max 20 chars per tag.
     - If seasonal/holiday elements are VISIBLE in the image, include them heavily.
@@ -132,11 +145,11 @@ def generate_seo_logic(img, p_type, desc, api_key, revision_request=""):
     - Room: Choose exactly 5 ONLY from {ALLOWED_ROOMS}
 
     # OUTPUT STRUCTURE (JSON)
-    Return ONLY a valid JSON object:
+    Return ONLY a valid JSON object with exactly 5 AltTexts:
     {{
         "Title": "...",
         "Description": "...",
-        "AltTexts": ["..."],
+        "AltTexts": ["...", "...", "...", "...", "..."],
         "Attributes": {{
             "1st Main Color": "...", "2nd Main Color": "...", "Home Style": "...",
             "Celebration": "...", "Occasion": "...", "Subject": ["..."], "Room": ["..."]
@@ -148,7 +161,6 @@ def generate_seo_logic(img, p_type, desc, api_key, revision_request=""):
     if revision_request:
         base_prompt += f"\n# REVISION REQUEST: {revision_request}\n"
 
-    # حلقه اعتبارسنجی پایتون (تلاش تا 3 بار در صورت تخلف هوش مصنوعی)
     max_retries = 3
     current_prompt = base_prompt
     
@@ -160,7 +172,6 @@ def generate_seo_logic(img, p_type, desc, api_key, revision_request=""):
         raw_text = response.text.replace('```json', '').replace('```', '').strip()
         data = json.loads(raw_text)
         
-        # بررسی لیست‌های مجاز توسط پایتون
         errors = []
         attrs = data.get("Attributes", {})
         
@@ -180,15 +191,12 @@ def generate_seo_logic(img, p_type, desc, api_key, revision_request=""):
         for r in rooms:
             if r not in ALLOWED_ROOMS: errors.append(f"Room '{r}' is not allowed.")
 
-        # اگر خطایی نبود، خروجی را برگردان
         if not errors:
             return data
             
-        # اگر خطا بود، به هوش مصنوعی تذکر بده و حلقه را تکرار کن
         st.toast(f"Checking AI compliance (Attempt {attempt+1})... Correcting attributes.")
-        current_prompt = base_prompt + "\n\nCRITICAL ERROR IN PREVIOUS ATTEMPT:\nYou used invalid attributes. Fix these errors immediately:\n" + "\n".join(errors)
+        current_prompt = base_prompt + "\n\nCRITICAL ERROR IN PREVIOUS ATTEMPT:\nYou used invalid attributes. Fix these errors immediately by strictly choosing from the provided lists:\n" + "\n".join(errors)
 
-    # اگر بعد از 3 بار نتوانست، همان را برمی‌گرداند تا سیستم متوقف نشود
     return data
 
 # ==========================================
@@ -269,7 +277,7 @@ else:
         desc_val = data.get('Description', '')
         st.text_area(f"Length: {len(desc_val)} chars (Limit: 400)", value=desc_val, height=200)
 
-        st.markdown("<div class='box-title'>🖼️ Alt Texts</div>", unsafe_allow_html=True)
+        st.markdown("<div class='box-title'>🖼️ Alt Texts (5 Options)</div>", unsafe_allow_html=True)
         alts = data.get('AltTexts', [])
         st.text_area("Select one:", value="\n".join([f"{i+1}. {alt}" for i, alt in enumerate(alts)]), height=150)
 
