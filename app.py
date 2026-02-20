@@ -159,7 +159,7 @@ if uploaded_file is not None:
                 """
                 
                 # رفع ارور نام مدل با اضافه کردن latest
-                model = genai.GenerativeModel('gemini-1.5-pro-latest')
+                model = genai.GenerativeModel('gemini-1.5-flash')
                 response = model.generate_content([prompt, image])
                 
                 st.success("✅ سئو با موفقیت انجام شد!")
@@ -171,3 +171,4 @@ if uploaded_file is not None:
                 
             except Exception as e:
                 st.error(f"خطایی رخ داد: {e}")
+
