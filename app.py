@@ -11,14 +11,14 @@ CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
 # --- ۲. تنظیمات پایه صفحه ---
 st.set_page_config(page_title="AtlasRank | Etsy SEO AI", page_icon="🚀", layout="wide")
 
-# ایجاد شیء احراز هویت
+# تنظیمات احراز هویت - نسخه اصلاح شده
 authenticator = Authenticate(
-    secret_key='atlas_rank_super_secret_key', 
-    cookie_name='atlas_rank_auth_cookie',
-    cookie_key='atlas_auth_key',
     client_id=CLIENT_ID,
     client_secret=CLIENT_SECRET,
-    redirect_uri="http://localhost:8501", 
+    redirect_uri="https://YOUR-APP-NAME.onrender.com", # آدرس رندر رو اینجا بذار
+    cookie_name='my_cookie_name',
+    cookie_key='this_is_secret_key', # اینجا قبلا secret_key بود که به cookie_key تغییر کرد
+    cookie_expiry_days=30
 )
 
 # بررسی وضعیت لاگین
@@ -56,7 +56,7 @@ if not st.session_state.get('connected'):
     with col_login:
         st.markdown("<br>", unsafe_allow_html=True)
         # دکمه لاگین گوگل
-        authenticator.login()
+        .login()
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ب) اگر لاگین موفق بود (محیط برنامه)
@@ -71,7 +71,7 @@ else:
         st.image(user_info.get('picture'), width=70)
         st.markdown("---")
         if st.button("Logout 🚪", use_container_width=True):
-            authenticator.logout()
+            .logout()
             st.rerun()
         
         st.markdown("### 🖼️ Recent Artworks")
