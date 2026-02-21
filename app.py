@@ -55,8 +55,8 @@ if not st.session_state.get('connected'):
     _, col_login, _ = st.columns([1.5, 1, 1.5])
     with col_login:
         st.markdown("<br>", unsafe_allow_html=True)
-        # دکمه لاگین گوگل
-        .login()
+        # دکمه لاگین گوگل - مطمئن شو دقیقاً به این شکل در یک خط باشد
+        authenticator.login()
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ب) اگر لاگین موفق بود (محیط برنامه)
