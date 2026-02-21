@@ -55,7 +55,7 @@ if not st.session_state.get('connected'):
     _, col_login, _ = st.columns([1.5, 1, 1.5])
     with col_login:
         st.markdown("<br>", unsafe_allow_html=True)
-        # دکمه لاگین گوگل - مطمئن شو دقیقاً به این شکل در یک خط باشد
+        # دکمه لاگین گوگل
         authenticator.login()
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -71,7 +71,8 @@ else:
         st.image(user_info.get('picture'), width=70)
         st.markdown("---")
         if st.button("Logout 🚪", use_container_width=True):
-            .logout()
+            # اصلاح شده: دستور خروج در یک خط قرار گرفت
+            authenticator.logout()
             st.rerun()
         
         st.markdown("### 🖼️ Recent Artworks")
