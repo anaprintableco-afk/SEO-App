@@ -11,16 +11,14 @@ CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
 # --- ۲. تنظیمات پایه صفحه ---
 st.set_page_config(page_title="AtlasRank | Etsy SEO AI", page_icon="🚀", layout="wide")
 
-# تنظیمات احراز هویت - مطابق با ورژن 1.1.8
+# تنظیمات احراز هویت - مخصوص ورژن 1.1.8 (بدون نام پارامتر)
 authenticator = Authenticate(
-    secret_credentials={
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
-    },
-    redirect_uri="https://atlasrank.net",
-    cookie_name='atlas_rank_user_cookie',
-    cookie_key='atlas_rank_secure_key',
-    cookie_expiry_days=30,
+    CLIENT_ID,
+    CLIENT_SECRET,
+    "https://atlasrank.net",
+    "atlas_rank_user_cookie",
+    "atlas_rank_secure_key",
+    30
 )
 
 # بررسی وضعیت لاگین
