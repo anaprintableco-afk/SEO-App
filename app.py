@@ -4,7 +4,7 @@ from streamlit_google_auth import Authenticate
 from PIL import Image
 import seo_engine
 
-# --- ۱. دریافت اطلاعات حساس از Environment Variables رندر ---
+# --- ۱. دریافت اطلاعات حساس ---
 CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
 CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -12,8 +12,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 # --- ۲. تنظیمات پایه صفحه ---
 st.set_page_config(page_title="AtlasRank | Etsy SEO AI", page_icon="🚀", layout="wide")
 
-# --- ۳. تنظیمات احراز هویت (نسخه ۵ آرگومانی برای رفع TypeError) ---
-# ترتیب: ID, Secret, Redirect, CookieName, CookieKey
+# --- ۳. تنظیمات احراز هویت ---
 authenticator = Authenticate(
     CLIENT_ID,
     CLIENT_SECRET,
@@ -22,10 +21,9 @@ authenticator = Authenticate(
     "atlas_rank_secure_key"
 )
 
-# بررسی وضعیت لاگین
-authenticator.check_authenticity()
+# نکته: خط check_authenticity حذف شد چون در این نسخه خودکار انجام می‌شود.
 
-# --- ۴. مدیریت وضعیت برنامه (Session States) ---
+# --- ۴. مدیریت وضعیت برنامه ---
 if 'seo_result' not in st.session_state: st.session_state.seo_result = None
 if 'is_running' not in st.session_state: st.session_state.is_running = False
 if 'history' not in st.session_state: st.session_state.history = []
@@ -42,10 +40,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# منطق اصلی نمایش: لندینگ یا پنل کاربری
+# منطق اصلی نمایش
 # ---------------------------------------------------------
 
-# الف) لندینگ پیج (کاربر لاگین نکرده)
+# بررسی وضعیت اتصال (در ورژن جدید متغیر connected معمولاً استفاده می‌شود)
 if not st.session_state.get('connected'):
     st.markdown('<div class="logo-text"><span class="logo-icon">A</span> AtlasRank</div>', unsafe_allow_html=True)
     
@@ -56,15 +54,13 @@ if not st.session_state.get('connected'):
     _, col_login, _ = st.columns([1.5, 1, 1.5])
     with col_login:
         st.markdown("<br>", unsafe_allow_html=True)
-        # فراخوانی متد لاگین
+        # دکمه لاگین
         authenticator.login()
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ب) پنل کاربری (لاگین موفقیت‌آمیز)
 else:
     user_info = st.session_state.get('user_info')
 
-    # سایدبار
     with st.sidebar:
         st.markdown('<div class="logo-text"><span class="logo-icon">A</span> AtlasRank</div>', unsafe_allow_html=True)
         if user_info:
@@ -102,7 +98,6 @@ else:
                 else:
                     with st.spinner("Analyzing Art..."):
                         img = Image.open(up)
-                        # اجرای موتور سئو با استفاده از کلید جمینای
                         res = seo_engine.generate_seo_data(img, p_type, user_note, GEMINI_API_KEY)
                         st.session_state.history.append({'img': img, 'title': res.get('Title', 'Untitled')})
                         st.session_state.seo_result = res
@@ -112,7 +107,6 @@ else:
             if up: st.image(Image.open(up), use_container_width=True, caption="Preview")
 
     else:
-        # نمایش نتایج سئو
         res = st.session_state.seo_result
         st.success("✅ SEO Optimized!")
         
