@@ -2,46 +2,60 @@
 import google.generativeai as genai
 import pandas as pd
 import json
-import constants
+import constants # وارد کردن لیست‌های رسمی از فایل قبلی
 
-def generate_listing(img, p_type, user_desc, api_key):
+def get_targeted_data(subject_query):
+    """فیلتر کردن هوشمند دیتابیس برای پیدا کردن بهترین کلمات کلیدی"""
+    try:
+        df = pd.read_csv("MASTER_API_DATA.csv")
+        filtered = df[df['Keyword'].str.contains(subject_query, case=False, na=False)]
+        if not filtered.empty:
+            return filtered.sort_values(by='Avg_Searches', ascending=False).head(50).to_string()
+        return df.sort_values(by='Avg_Searches', ascending=False).head(50).to_string()
+    except:
+        return "Database not available."
+
+def generate_listing(img, p_type, api_key):
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('models/gemini-2.5-flash')
     
-    # تشخیص سوژه برای فیلتر دیتابیس
-    vision_res = model.generate_content(["Identify this art subject in 1 word", img])
-    subject_query = vision_res.text.strip()
+    # 1. تشخیص سوژه برای سرچ در دیتابیس
+    vision_res = model.generate_content(["What is the main subject of this art? (1 word)", img])
+    subject = vision_res.text.strip()
     
-    # فیلتر کردن دیتابیس (ساده شده برای تست)
-    csv_context = "Use relevant high-search keywords from database." 
-
+    # 2. گرفتن دیتا از CSV
+    csv_context = get_targeted_data(subject)
+    
+    # 3. پرامپت نهایی برای تولید تمام بخش‌ها
     prompt = f"""
-    You are an Etsy SEO Master.
-    Mode: {p_type} | Subject: {subject_query}
+    You are an Etsy SEO Master. Mode: {p_type}
+    Use this CSV data for keywords: {csv_context}
     
-    # RULES:
-    1. Attributes: Choose ONLY from: 
-       Colors: {constants.ALLOWED_COLORS}, Subjects: {constants.ALLOWED_SUBJECTS}, 
-       Rooms: {constants.ALLOWED_ROOMS}, Styles: {constants.ALLOWED_STYLES}.
-    2. Tags: 13 phrases.
-    3. TV Mode Rules: {constants.FORBIDDEN_TV_WORDS} are forbidden. Mention 16:9 ratio.
-
-    Return JSON strictly:
+    # STRICT RULES FOR ATTRIBUTES:
+    - Pick '1st Main Color' & '2nd Main Color' ONLY from: {constants.ALLOWED_COLORS}
+    - Pick 'Subject' ONLY from: {constants.ALLOWED_SUBJECTS}
+    - Pick 'Room' ONLY from: {constants.ALLOWED_ROOMS}
+    - Pick 'Home Style' ONLY from: {constants.ALLOWED_STYLES}
+    
+    # TV MODE RULES:
+    {'Forbidden: print, printable, canvas, paper.' if p_type == "Art for frame TV" else ''}
+    
+    Return ONLY JSON:
     {{
         "Title": "...",
         "Description": "...",
-        "Tags": [],
-        "AltTexts": [],
+        "Tags": ["...13 tags..."],
         "Attributes": {{
             "1st Main Color": "...",
             "2nd Main Color": "...",
-            "Home Style": "...",
-            "Subject": ["..."],
-            "Room": ["..."],
-            "Celebration": "...",
-            "Occasion": "..."
+            "Subject": "...",
+            "Room": "...",
+            "Home Style": "..."
         }}
     }}
     """
+    
     response = model.generate_content([prompt, img])
-    return json.loads(response.text.replace('```json', '').replace('```', '').strip())
+    # استخراج و تمیز کردن JSON
+    clean_json = response.text.replace('```json', '').replace('```', '').strip()
+    return json.loads(clean_json)
