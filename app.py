@@ -75,7 +75,7 @@ def get_or_upload_csv(_api_key):
 # ==========================================
 def generate_seo_logic(img, p_type, desc, api_key, revision_request=""):
     csv_file = get_or_upload_csv(api_key)
-    model = genai.GenerativeModel('models/gemini-2.0-flash')
+    model = genai.GenerativeModel('models/gemini-2.5-flash')
     
     if p_type == "Art for frame TV":
         mode_rules = """
