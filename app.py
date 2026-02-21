@@ -15,7 +15,7 @@ st.set_page_config(page_title="AtlasRank | Etsy SEO AI", page_icon="🚀", layou
 authenticator = Authenticate(
     client_id=CLIENT_ID,
     client_secret=CLIENT_SECRET,
-    redirect_uri="https://YOUR-APP-NAME.onrender.com", # آدرس رندر رو اینجا بذار
+    redirect_uri="https://atlasrank.onrender.com", # آدرس رندر رو اینجا بذار
     cookie_name='my_cookie_name',
     cookie_key='this_is_secret_key', # اینجا قبلا secret_key بود که به cookie_key تغییر کرد
     cookie_expiry_days=30
