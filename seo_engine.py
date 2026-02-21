@@ -5,7 +5,7 @@ import json
 import constants
 
 def get_targeted_csv_data(subject_keyword):
-    """فیلتر کردن هوشمند دیتابیس برای کلمات مرتبط با سوژه"""
+    # (همان کد قبلی برای فیلتر دیتابیس)
     try:
         df = pd.read_csv("MASTER_API_DATA.csv")
         filtered = df[df['Keyword'].str.contains(subject_keyword, case=False, na=False)]
@@ -13,56 +13,71 @@ def get_targeted_csv_data(subject_keyword):
             return filtered.sort_values(by='Avg_Searches', ascending=False).head(50).to_string()
         return df.sort_values(by='Avg_Searches', ascending=False).head(50).to_string()
     except:
-        return "Database connection error or file not found."
+        return "Database connection error."
 
 def generate_listing_logic(img, p_type, api_key):
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('models/gemini-2.5-flash')
     
-    # 1. تشخیص سوژه برای جستجو در دیتابیس
-    vision_res = model.generate_content(["What is the main subject of this art? (Output only 1 word)", img])
+    # 1. تشخیص سوژه
+    vision_res = model.generate_content(["Identify the main subject in 1 word.", img])
     subj_word = vision_res.text.strip()
     
-    # 2. استخراج کلمات کلیدی طلایی
     csv_context = get_targeted_csv_data(subj_word)
     
-    # 3. تولید سئو با قوانین سفت و سخت
+    # 2. تعریف "فرم توخالی" (این کلید حل مشکل توست)
+    empty_form = """
+    {
+        "Title": "",
+        "Description": "",
+        "Tags": [],
+        "AltTexts": [],
+        "Attributes": {
+            "1st Main Color": "",
+            "2nd Main Color": "",
+            "Subject": "",
+            "Home Style": "",
+            "Room": "",
+            "Celebration": "",
+            "Occasion": ""
+        }
+    }
+    """
+    
+    # 3. قوانین پر کردن فرم
     prompt = f"""
-    You are an expert Etsy SEO Master for AtlasRank.net. 
-    Mode: {p_type} | Detected Subject: {subj_word}
+    You are an Etsy SEO Machine. Your ONLY job is to fill in the blank JSON form provided below.
+    DO NOT change the structure, keys, or format of the JSON. 
     
-    # DATA CONTEXT (From CSV):
-    {csv_context}
+    Mode: {p_type}
+    Subject: {subj_word}
+    CSV Data: {csv_context}
     
-    # STRICT RULES:
-    1. TAGS: Exactly 13 tags. EVERY tag MUST be under 20 characters. No single words.
-    2. ATTRIBUTES: You MUST fill all attributes below using ONLY these allowed lists:
+    # RULES FOR FILLING THE FORM:
+    1. "Title": Under 100 characters.
+    2. "Tags": Exactly 13 phrases. Max 20 chars per phrase.
+    3. "Description": { 'MUST include 16:9 ratio.' if p_type == 'Art for frame TV' else 'Standard description.' }
+    4. "AltTexts": Exactly 5 descriptive sentences.
+    5. "Attributes": You MUST pick values EXACTLY from these lists:
        - Colors: {constants.ALLOWED_COLORS}
        - Style: {constants.ALLOWED_STYLES}
        - Subject: {constants.ALLOWED_SUBJECTS}
        - Room: {constants.ALLOWED_ROOMS}
        - Celebration: {constants.ALLOWED_CELEBRATIONS}
        - Occasion: {constants.ALLOWED_OCCASIONS}
-    3. TV MODE: {'STRICTLY FORBIDDEN to use these words: ' + str(constants.FORBIDDEN_TV_WORDS) + '. You MUST mention 16:9 ratio.' if p_type == 'Art for frame TV' else ''}
 
-    Return ONLY a valid JSON object matching this structure:
-    {{
-        "Title": "...",
-        "Description": "...",
-        "Tags": ["...", "..."],
-        "AltTexts": ["...", "...", "...", "...", "..."],
-        "Attributes": {{
-            "1st Main Color": "...",
-            "2nd Main Color": "...",
-            "Subject": "...",
-            "Home Style": "...",
-            "Room": "...",
-            "Celebration": "...",
-            "Occasion": "..."
-        }}
-    }}
+    # BLANK FORM TO FILL:
+    {empty_form}
     """
     
-    response = model.generate_content([prompt, img])
-    clean_json = response.text.replace('```json', '').replace('```', '').strip()
-    return json.loads(clean_json)
+    # 4. قفل کردن خروجی روی JSON خالص (این جلوی توهم هوش مصنوعی را می‌گیرد)
+    generation_config = genai.types.GenerationConfig(
+        response_mime_type="application/json",
+    )
+    
+    response = model.generate_content(
+        [prompt, img],
+        generation_config=generation_config # اعمال قفل
+    )
+    
+    return json.loads(response.text)
