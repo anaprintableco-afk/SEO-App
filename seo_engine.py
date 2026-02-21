@@ -34,7 +34,7 @@ def process_database(dna_keywords, core_subject):
 
 def generate_seo_data(img, p_type, user_note, api_key): # متغیر user_note اضافه شد
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('models/gemini-2.5-flash')
+    model = genai.GenerativeModel('models/gemini-2.0-flash')
 
     # فاز 1: استخراج DNA و تزریق توضیح کاربر
     vision_prompt = "Describe this art in a comma-separated list of 5 keywords (subject, style, technique, vibe, colors). Then, as the very last word, write the main core subject in 1 word."
