@@ -2,60 +2,67 @@
 import google.generativeai as genai
 import pandas as pd
 import json
-import constants # وارد کردن لیست‌های رسمی از فایل قبلی
+import constants
 
-def get_targeted_data(subject_query):
-    """فیلتر کردن هوشمند دیتابیس برای پیدا کردن بهترین کلمات کلیدی"""
+def get_targeted_csv_data(subject_keyword):
+    """فیلتر کردن هوشمند دیتابیس برای کلمات مرتبط با سوژه"""
     try:
         df = pd.read_csv("MASTER_API_DATA.csv")
-        filtered = df[df['Keyword'].str.contains(subject_query, case=False, na=False)]
+        filtered = df[df['Keyword'].str.contains(subject_keyword, case=False, na=False)]
         if not filtered.empty:
             return filtered.sort_values(by='Avg_Searches', ascending=False).head(50).to_string()
         return df.sort_values(by='Avg_Searches', ascending=False).head(50).to_string()
     except:
-        return "Database not available."
+        return "Database connection error or file not found."
 
-def generate_listing(img, p_type, api_key):
+def generate_listing_logic(img, p_type, api_key):
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('models/gemini-2.5-flash')
     
-    # 1. تشخیص سوژه برای سرچ در دیتابیس
-    vision_res = model.generate_content(["What is the main subject of this art? (1 word)", img])
-    subject = vision_res.text.strip()
+    # 1. تشخیص سوژه برای جستجو در دیتابیس
+    vision_res = model.generate_content(["What is the main subject of this art? (Output only 1 word)", img])
+    subj_word = vision_res.text.strip()
     
-    # 2. گرفتن دیتا از CSV
-    csv_context = get_targeted_data(subject)
+    # 2. استخراج کلمات کلیدی طلایی
+    csv_context = get_targeted_csv_data(subj_word)
     
-    # 3. پرامپت نهایی برای تولید تمام بخش‌ها
+    # 3. تولید سئو با قوانین سفت و سخت
     prompt = f"""
-    You are an Etsy SEO Master. Mode: {p_type}
-    Use this CSV data for keywords: {csv_context}
+    You are an expert Etsy SEO Master for AtlasRank.net. 
+    Mode: {p_type} | Detected Subject: {subj_word}
     
-    # STRICT RULES FOR ATTRIBUTES:
-    - Pick '1st Main Color' & '2nd Main Color' ONLY from: {constants.ALLOWED_COLORS}
-    - Pick 'Subject' ONLY from: {constants.ALLOWED_SUBJECTS}
-    - Pick 'Room' ONLY from: {constants.ALLOWED_ROOMS}
-    - Pick 'Home Style' ONLY from: {constants.ALLOWED_STYLES}
+    # DATA CONTEXT (From CSV):
+    {csv_context}
     
-    # TV MODE RULES:
-    {'Forbidden: print, printable, canvas, paper.' if p_type == "Art for frame TV" else ''}
-    
-    Return ONLY JSON:
+    # STRICT RULES:
+    1. TAGS: Exactly 13 tags. EVERY tag MUST be under 20 characters. No single words.
+    2. ATTRIBUTES: You MUST fill all attributes below using ONLY these allowed lists:
+       - Colors: {constants.ALLOWED_COLORS}
+       - Style: {constants.ALLOWED_STYLES}
+       - Subject: {constants.ALLOWED_SUBJECTS}
+       - Room: {constants.ALLOWED_ROOMS}
+       - Celebration: {constants.ALLOWED_CELEBRATIONS}
+       - Occasion: {constants.ALLOWED_OCCASIONS}
+    3. TV MODE: {'STRICTLY FORBIDDEN to use these words: ' + str(constants.FORBIDDEN_TV_WORDS) + '. You MUST mention 16:9 ratio.' if p_type == 'Art for frame TV' else ''}
+
+    Return ONLY a valid JSON object matching this structure:
     {{
         "Title": "...",
         "Description": "...",
-        "Tags": ["...13 tags..."],
+        "Tags": ["...", "..."],
+        "AltTexts": ["...", "...", "...", "...", "..."],
         "Attributes": {{
             "1st Main Color": "...",
             "2nd Main Color": "...",
             "Subject": "...",
+            "Home Style": "...",
             "Room": "...",
-            "Home Style": "..."
+            "Celebration": "...",
+            "Occasion": "..."
         }}
     }}
     """
     
     response = model.generate_content([prompt, img])
-    # استخراج و تمیز کردن JSON
     clean_json = response.text.replace('```json', '').replace('```', '').strip()
     return json.loads(clean_json)
